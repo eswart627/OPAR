@@ -16,8 +16,8 @@ import boto3
 # Load .env from current working directory
 load_dotenv(dotenv_path=Path.cwd() / ".env", override=True)
 
-GCP_ADMIN_KEY_PATH = os.environ["GCP_ADMIN_KEY_PATH"]
-AWS_REGION = os.environ["AWS_REGION"]
+GCP_ADMIN_KEY_PATH = os.environ.get("GCP_ADMIN_KEY_PATH", "")
+AWS_REGION = os.environ.get("AWS_REGION", "ap-south-1")
 AWS_ADMIN_ACCESS_KEY = os.environ["AWS_ADMIN_ACCESS_KEY"]
 AWS_ADMIN_SECRET_KEY = os.environ["AWS_ADMIN_SECRET_KEY"]
 
@@ -31,7 +31,11 @@ RESOURCE_DIR = ARTIFACTS_DIR / "resources"
 # ---------------------------------------------------------------------
 
 # GCP
-gcp_client = gcp_storage.Client.from_service_account_json(GCP_ADMIN_KEY_PATH)
+GCP_PROJECT_ID = os.environ.get("GCP_PROJECT_ID", "project-444c1d0a-6028-4d76-8d5")
+if GCP_ADMIN_KEY_PATH and os.path.exists(GCP_ADMIN_KEY_PATH):
+    gcp_client = gcp_storage.Client.from_service_account_json(GCP_ADMIN_KEY_PATH)
+else:
+    gcp_client = gcp_storage.Client(project=GCP_PROJECT_ID)
 
 # AWS
 s3_client = boto3.client(
@@ -41,48 +45,80 @@ s3_client = boto3.client(
     region_name=AWS_REGION,
 )
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from tqdm import tqdm
+
 # ---------------------------------------------------------------------
 # Upload helpers
 # ---------------------------------------------------------------------
 
-def upload_to_gcp(bucket_name: str, file_path: str, blob_name: str) -> None:
+def upload_to_gcp(bucket_name: str, file_path: str, blob_name: str) -> bool:
     """Upload a single file to a GCS bucket."""
-    bucket = gcp_client.bucket(bucket_name)
-    blob = bucket.blob(blob_name)
-    blob.upload_from_filename(file_path)
-    print(f"[GCP][INFO] Uploaded: {blob_name} → {bucket_name}")
+    try:
+        bucket = gcp_client.bucket(bucket_name)
+        blob = bucket.blob(blob_name)
+        blob.upload_from_filename(file_path)
+        return True
+    except Exception as e:
+        print(f"[GCP][ERROR] Failed {blob_name} -> {bucket_name}: {e}")
+        return False
 
-def upload_to_aws(bucket_name: str, file_path: str, key: str) -> None:
+def upload_to_aws(bucket_name: str, file_path: str, key: str) -> bool:
     """Upload a single file to an S3 bucket."""
-    s3_client.upload_file(file_path, bucket_name, key)
-    print(f"[AWS][INFO] Uploaded: {key} → {bucket_name}")
+    try:
+        s3_client.upload_file(file_path, bucket_name, key)
+        return True
+    except Exception as e:
+        print(f"[AWS][ERROR] Failed {key} -> {bucket_name}: {e}")
+        return False
 
 # ---------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------
 
-def upload_all() -> None:
-    """Upload all files under ./resources according to the storage map."""
+def _upload_task(item):
+    file_name, info = item
+    provider = info["provider"]
+    bucket = info["bucket"]
+    file_path = os.path.join(RESOURCE_DIR, provider.upper(), bucket, file_name)
+
+    if not os.path.exists(file_path):
+        return False
+
+    if provider == "gcp":
+        return upload_to_gcp(bucket, file_path, file_name)
+    elif provider == "aws":
+        return upload_to_aws(bucket, file_path, file_name)
+    return False
+
+def upload_all(max_workers: int = 30) -> None:
+    """Upload all files under ./resources according to the storage map with concurrency."""
     with open(STORAGE_MAP_FILE, "r", encoding="utf-8") as f:
         storage_map = json.load(f)
 
-    for file_name, info in storage_map.items():
-        provider = info["provider"]
-        bucket = info["bucket"]
-        file_path = os.path.join(RESOURCE_DIR, provider.upper(), bucket, file_name)
+    total_files = len(storage_map)
+    print(f"[INFO] Starting upload of {total_files} files across 10 buckets (Workers: {max_workers})...")
 
-        if not os.path.exists(file_path):
-            print(f"[ERROR] File not found: {file_path}")
-            continue
+    items = list(storage_map.items())
+    completed = 0
+    errors = 0
 
-        if provider == "gcp":
-            upload_to_gcp(bucket, file_path, file_name)
-        elif provider == "aws":
-            upload_to_aws(bucket, file_path, file_name)
-        else:
-            print(f"[ERROR] Unknown provider: {provider}")
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(_upload_task, item): item for item in items}
+        
+        for future in as_completed(futures):
+            res = future.result()
+            if res:
+                completed += 1
+            else:
+                errors += 1
+            
+            # Print live update every 500 files or at completion
+            if completed % 500 == 0 or (completed + errors) == total_files:
+                pct = ((completed + errors) / total_files) * 100
+                print(f"[UPLOAD PROGRESS] {completed + errors}/{total_files} ({pct:.1f}%) uploaded | Success: {completed}, Errors: {errors}")
 
-    print("[INFO] All uploads complete.")
+    print(f"[INFO] All uploads finished! Total successfully uploaded: {completed}/{total_files}")
 
 # ---------------------------------------------------------------------
 # Entry

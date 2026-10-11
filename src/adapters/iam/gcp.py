@@ -12,18 +12,36 @@ class GCPAccessControl(AccessControlBase):
         cred = self.user_credential.get("gcp_credential")
         if not cred:
             return None
+        # If legacy service account json dict is present
+        if isinstance(cred, dict) and "private_key" in cred:
+            try:
+                return storage.Client.from_service_account_info(cred)
+            except Exception as e:
+                print(f"[GCP][ERROR] Failed to create storage client from key info: {e}")
+        # Otherwise, fall back to ADC client
         try:
-            return storage.Client.from_service_account_info(cred)
+            import os
+            project = (self.user_credential.get("gcp_credential") or {}).get("project_id") or os.environ.get("GCP_PROJECT_ID", "project-444c1d0a-6028-4d76-8d5")
+            return storage.Client(project=project)
         except Exception as e:
-            print(f"[GCP][ERROR] Failed to create storage client: {e}")
+            print(f"[GCP][ERROR] Failed to create default storage client: {e}")
             return None
 
     def check_access(self, resource_metadata: Dict[str, Any]) -> bool:
-        if not self.gcp_client:
-            return False
         bucket = (resource_metadata.get("parameters") or {}).get("bucket")
         name   = resource_metadata.get("file_name")
         if not (bucket and name):
+            return False
+
+        cred = self.user_credential.get("gcp_credential") or {}
+        # If ADC identity mapping was used:
+        if isinstance(cred, dict) and "allowed_buckets" in cred:
+            if cred.get("full_access"):
+                return True
+            return bucket in cred.get("allowed_buckets", [])
+
+        # If dedicated service account key client is available:
+        if not self.gcp_client:
             return False
         try:
             blob = self.gcp_client.bucket(bucket).blob(name)

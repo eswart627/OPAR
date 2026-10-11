@@ -29,12 +29,12 @@ ACCESS_MODEL_PATH = ARTIFACTS_DIR / "generated_access_model.json"
 OUTPUT_BASE_DIR = ARTIFACTS_DIR / "resources"
 STORAGE_MAP_OUTPUT = ARTIFACTS_DIR / "file_to_storage_info.json"
 
-GCP_REGION = "asia-northeast3"
+GCP_REGION = os.getenv("GCP_LOCATION", "asia-south1")
 GCP_ENDPOINT = "https://storage.googleapis.com"  # reserved for future use
 GCP_IAM = "google iam"
 
-AWS_REGION = "ap-northeast-2"
-AWS_ENDPOINT = "https://s3.ap-northeast-2.amazonaws.com"  # reserved for future use
+AWS_REGION = os.getenv("AWS_REGION", "ap-south-1")
+AWS_ENDPOINT = f"https://s3.{AWS_REGION}.amazonaws.com"  # reserved for future use
 AWS_IAM = "aws iam"
 
 # ---------------------------------------------------------------------

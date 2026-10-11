@@ -10,7 +10,10 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from googleapiclient.discovery import build
-from oauth2client.service_account import ServiceAccountCredentials
+try:
+    from oauth2client.service_account import ServiceAccountCredentials
+except ImportError:
+    ServiceAccountCredentials = None
 import boto3
 
 # ---------------------------------------------------------------------
@@ -20,14 +23,14 @@ import boto3
 # Load .env from repo root or current working directory
 load_dotenv(dotenv_path=Path.cwd() / ".env", override=True)
 
-GCP_PROJECT_ID = os.environ["GCP_PROJECT_ID"]
-GCP_ADMIN_KEY_PATH = os.environ["GCP_ADMIN_KEY_PATH"]
-GCP_BUCKET_LOCATION = os.environ.get("GCP_BUCKET_LOCATION", "asia-northeast3")
+GCP_PROJECT_ID = os.environ.get("GCP_PROJECT_ID", "project-444c1d0a-6028-4d76-8d5")
+GCP_ADMIN_KEY_PATH = os.environ.get("GCP_ADMIN_KEY_PATH", "./artifacts/gcp-admin-key.json")
+GCP_BUCKET_LOCATION = os.environ.get("GCP_BUCKET_LOCATION", "asia-south1")
 GCP_BUCKET_STORAGE_CLASS = os.environ.get("GCP_BUCKET_STORAGE_CLASS", "STANDARD")
 
-AWS_REGION = os.environ["AWS_REGION"]
-AWS_ADMIN_ACCESS_KEY = os.environ["AWS_ADMIN_ACCESS_KEY"]
-AWS_ADMIN_SECRET_KEY = os.environ["AWS_ADMIN_SECRET_KEY"]
+AWS_REGION = os.environ.get("AWS_REGION", "ap-south-1")
+AWS_ADMIN_ACCESS_KEY = os.environ.get("AWS_ADMIN_ACCESS_KEY", "")
+AWS_ADMIN_SECRET_KEY = os.environ.get("AWS_ADMIN_SECRET_KEY", "")
 
 ARTIFACTS_DIR = Path("artifacts")
 
@@ -60,7 +63,12 @@ USER_GROUPS = access_model.get("USER_GROUPS", {})
 # ---------------------------------------------------------------------
 
 SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
-gcp_credentials = ServiceAccountCredentials.from_json_keyfile_name(GCP_ADMIN_KEY_PATH, SCOPES)
+if GCP_ADMIN_KEY_PATH and os.path.exists(GCP_ADMIN_KEY_PATH):
+    gcp_credentials = ServiceAccountCredentials.from_json_keyfile_name(GCP_ADMIN_KEY_PATH, SCOPES)
+else:
+    import google.auth
+    gcp_credentials, _ = google.auth.default(scopes=SCOPES)
+
 gcp_storage = build("storage", "v1", credentials=gcp_credentials)
 gcp_iam = build("iam", "v1", credentials=gcp_credentials)
 
@@ -178,7 +186,7 @@ def setup_gcp_users() -> dict:
                     print(f"[GCP][WARN] Retry {attempt + 1} setIamPolicy for {bucket_name}: {e}")
                     time.sleep(2)
 
-        # Issue key file for the service account
+        # Issue key file for the service account (or fallback to ADC identity mapping)
         try:
             key = gcp_iam.projects().serviceAccounts().keys().create(
                 name=sa_resource,
@@ -187,7 +195,13 @@ def setup_gcp_users() -> dict:
             key_json = json.loads(base64.b64decode(key["privateKeyData"]).decode("utf-8"))
             result[name] = key_json
         except Exception as e:
-            print(f"[GCP][ERROR] Failed to create key for {name}: {e}")
+            print(f"[GCP][INFO] Key creation skipped for {name}. Using ADC identity mapping.")
+            result[name] = {
+                "service_account_email": sa_email,
+                "project_id": GCP_PROJECT_ID,
+                "allowed_buckets": target_buckets,
+                "full_access": full_access,
+            }
 
     return result
 

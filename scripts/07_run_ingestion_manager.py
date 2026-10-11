@@ -5,17 +5,11 @@
 import sys
 import os
 from pathlib import Path
-from src.managers.ingestion_manager import IngestionManager, IngestionConfig
-
-# ---------------------------------------------------------------------
-# Path setup
-# ---------------------------------------------------------------------
-
-# 1. Add project root to sys.path for src imports
-project_root = os.path.abspath(os.path.join(os.getcwd(), ".."))
+project_root = str(Path(__file__).resolve().parent.parent)
 if project_root not in sys.path:
-    sys.path.append(project_root)
-    print(f"[INFO] Added project root to sys.path: {project_root}")
+    sys.path.insert(0, project_root)
+
+from src.managers.ingestion_manager import IngestionManager, IngestionConfig
 
 # 2. Define artifacts directory path
 ARTIFACTS_DIR = Path("artifacts")

@@ -5,10 +5,21 @@ __pycache__/
 .venv/
 .env
 
+# Secrets & Credentials
+*credential*
+*.key
+*.pem
+
 # VSCode / OS
 .vscode/
 .DS_Store
 
-# Project
-artifacts/*.json
-artifacts/*.csv
+# Generated Test Outputs & Results
+results/
+logs/
+*.log
+
+# Data & Artifacts (HotpotQA, FAISS index, and extracted text)
+artifacts/
+!artifacts/hotpot_evaluate_v1.py
+!artifacts/hotpot_evaluate_with_em_admin.py

@@ -1,10 +1,8 @@
 from typing import Dict, Any, List, Optional
-import json, random, time
+import os, json, random, time
 from tqdm import tqdm
-from langchain.prompts import PromptTemplate
-from langchain.chains.question_answering import load_qa_chain
-from langchain_openai import ChatOpenAI
-from langchain.schema import Document
+from langchain_core.prompts import PromptTemplate
+from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from src.retrievers.permission_retriever import PermissionRetriever, PermissionRetrieverConfig
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -22,7 +20,12 @@ class QuestionProcessor:
         self.uuid_to_metadata = {m["global_uuid"]: m for m in metadata}
         self.sampled_questions: Optional[List[Dict[str, Any]]] = None
 
-        self.llm = ChatOpenAI(temperature=0, model_name="gpt-4o-mini")
+        if os.environ.get("OPENAI_API_KEY"):
+            from langchain_openai import ChatOpenAI
+            self.llm = ChatOpenAI(temperature=0, model_name="gpt-4o-mini")
+        else:
+            from src.processors.model_fallback import GeminiFallbackChatModel
+            self.llm = GeminiFallbackChatModel()
         self.prompt = PromptTemplate.from_template(
             "You are an intelligent assistant. Based on the given context,\n"
             "answer the question concisely in a single word or short phrase.\n"
@@ -133,8 +136,17 @@ class QuestionProcessor:
             if predicted_answer == "ERROR":
                 predicted_answer = "I don't know."
 
+            retrieved_files = [self.uuid_to_metadata.get(row["global_uuid"], {}).get("file_name", "") for row in retrieved]
+            accessed_files = [self.uuid_to_metadata.get(f.get("global_uuid"), {}).get("file_name", "") for f in filtered]
+            denied_files = [fn for fn in retrieved_files if fn not in accessed_files]
+
             return {
                 "question_id": q.get("id"),
+                "question": qtext,
+                "gold_answer": q.get("gold_answer", ""),
+                "retrieved_docs": retrieved_files,
+                "accessed_docs": accessed_files,
+                "denied_docs": denied_files,
                 "predicted_answer": predicted_answer,
                 "retrieved_count": len(retrieved),
                 "q_expected_true": q_expected_true,
