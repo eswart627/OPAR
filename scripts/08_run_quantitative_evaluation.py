@@ -58,7 +58,7 @@ def main():
     
     # ----- Managers / Stores -----
     user_manager = CredentialManager(base_path=ARTIFACTS, file_name="test_credential.txt")
-    vs = VectorStore(model_name="all-MiniLM-L6-v2")
+    vs = VectorStore(model_name="BAAI/bge-base-en-v1.5")
     vs.load(FAISS_INDEX, FAISS_META)
 
     ms = MetadataStore()
@@ -207,7 +207,7 @@ def main():
         f"  - Top-k Retrieved:     {TOP_K}",
         f"  - Concurrency:         {QUESTION_CONCURRENCY} worker(s)",
         f"  - Target Users:        {', '.join(sorted(TARGET_USERS))}",
-        f"  - Vector Store:        FAISS (all-MiniLM-L6-v2, 384-dim)",
+        f"  - Vector Store:        FAISS (BAAI/bge-base-en-v1.5, 768-dim)",
         f"  - LLM Backend:         Gemini Fallback Engine (models.ini)",
         f"  - Total Elapsed Time:  {total_time}s",
         "-" * 105,
