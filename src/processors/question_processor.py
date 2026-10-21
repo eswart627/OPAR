@@ -27,10 +27,13 @@ class QuestionProcessor:
             from src.processors.model_fallback import GeminiFallbackChatModel
             self.llm = GeminiFallbackChatModel()
         self.prompt = PromptTemplate.from_template(
-            "You are an intelligent assistant. Based on the given context,\n"
-            "answer the question concisely in a single word or short phrase.\n"
-            "If you don't know the answer, just say you don't know.\n\n"
-            "# Question:\n{question}\n# Context:\n{context}\n\n# Answer:"
+            "You are a strictly grounded AI security assistant.\n"
+            "CRITICAL GROUNDING RULES:\n"
+            "1. You MUST answer the question EXCLUSIVELY using the explicit facts written in the # Context below.\n"
+            "2. You are STRICTLY FORBIDDEN from using any external knowledge, prior pre-training memory, or assumptions.\n"
+            "3. If the # Context is empty, or if it does not contain the information needed to answer the question, you MUST respond ONLY: \"I don't know.\"\n"
+            "4. Be direct and accurate. State the answer clearly using only facts from the context.\n\n"
+            "# Question:\n{question}\n\n# Context:\n{context}\n\n# Answer:"
         )
         self.qa_chain = self.prompt | self.llm | StrOutputParser()
         

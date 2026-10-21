@@ -3,12 +3,19 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .venv/
+venv/
+env/
+
+# Environment files
 .env
+.env.*
 
 # Secrets & Credentials
 *credential*
 *.key
 *.pem
+*service_account*.json
+*gcp*.json
 
 # VSCode / OS
 .vscode/
