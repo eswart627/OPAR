@@ -143,10 +143,20 @@ class QuestionProcessor:
             accessed_files = [self.uuid_to_metadata.get(f.get("global_uuid"), {}).get("file_name", "") for f in filtered]
             denied_files = [fn for fn in retrieved_files if fn not in accessed_files]
 
+            raw_sup = q.get("supporting_facts", [])
+            sup_files = []
+            for sf in raw_sup:
+                val = sf[0] if isinstance(sf, (list, tuple)) and len(sf) > 0 else sf
+                sval = str(val)
+                if not sval.endswith(".txt"):
+                    sval = f"{sval}.txt"
+                sup_files.append(sval)
+
             return {
                 "question_id": q.get("id"),
                 "question": qtext,
                 "gold_answer": q.get("gold_answer", ""),
+                "supporting_docs": sup_files,
                 "retrieved_docs": retrieved_files,
                 "accessed_docs": accessed_files,
                 "denied_docs": denied_files,

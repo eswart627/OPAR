@@ -7,6 +7,7 @@ from typing import Dict, Any, List, Tuple
 
 from tqdm import tqdm
 from src.stores.vector_store import VectorStore
+from src.stores.bm25_store import BM25Store
 
 def sanitize_filename(title: str) -> str:
     title = title.lower().replace(" ", "_")
@@ -19,6 +20,7 @@ class IngestionConfig:
     output_dir: str = "artifacts"
     faiss_index_name: str = "faiss.index"
     faiss_meta_name: str = "faiss_metadata.json"
+    bm25_index_name: str = "bm25.pkl"
     metadata_name: str = "metadata.json"
     embedding_model: str = "all-MiniLM-L6-v2"
     gcp_endpoint: str = "https://storage.googleapis.com"
@@ -30,6 +32,7 @@ class IngestionManager:
         self.cfg = cfg
         os.makedirs(self.cfg.output_dir, exist_ok=True)
         self.vector_store = VectorStore(self.cfg.embedding_model)
+        self.bm25_store = BM25Store()
 
     def ingest(self) -> Dict[str, str]:
         storage_map = self._load_json(self.cfg.storage_map_path)
@@ -45,16 +48,22 @@ class IngestionManager:
         vecmeta_path = os.path.join(self.cfg.output_dir, self.cfg.faiss_meta_name)
         self.vector_store.save(index_path, vecmeta_path)
 
+        print("Building BM25 index from records...")
+        self.bm25_store.build_from_records(records)
+        bm25_path = os.path.join(self.cfg.output_dir, self.cfg.bm25_index_name)
+        self.bm25_store.save(bm25_path)
+
         access_meta = [meta for _, _, meta in records]
         meta_path = os.path.join(self.cfg.output_dir, self.cfg.metadata_name)
         with open(meta_path, "w", encoding="utf-8") as f:
             json.dump(access_meta, f, indent=2, ensure_ascii=False)
         print(f"Saved access metadata to {meta_path}")
-        print("\nIngestion complete.")
+        print("\nDual ingestion (FAISS + BM25) complete.")
 
         return {
             "faiss_index": index_path,
             "faiss_metadata": vecmeta_path,
+            "bm25_index": bm25_path,
             "metadata": meta_path,
         }
 

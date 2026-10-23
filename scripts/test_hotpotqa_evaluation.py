@@ -87,7 +87,7 @@ def run_hotpotqa_test(sample_size: int = 10, target_users: List[str] = None):
 
     # 2. Load Vector Store and Credentials
     print("\n[2/4] Loading FAISS index and stores...")
-    vs = VectorStore(model_name="BAAI/bge-base-en-v1.5")
+    vs = VectorStore(model_name="all-MiniLM-L6-v2")
     vs.load(str(faiss_index), str(faiss_meta))
 
     ms = MetadataStore()

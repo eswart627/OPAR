@@ -44,7 +44,7 @@ from src.processors.question_processor import QuestionProcessor
 # -----------------------------------------------------------------------------
 
 class HybridRetrieverProvider:
-    def __init__(self, index_path: str, meta_path: str, bm25_path: str, model_name: str = "BAAI/bge-base-en-v1.5"):
+    def __init__(self, index_path: str, meta_path: str, bm25_path: str, model_name: str = "all-MiniLM-L6-v2"):
         self.model = SentenceTransformer(model_name)
         self.faiss_index = faiss.read_index(index_path)
         with open(meta_path, "r", encoding="utf-8") as f:
@@ -82,7 +82,7 @@ class HybridRetrieverProvider:
 
 
 class DenseFAISSRetrieverProvider:
-    def __init__(self, index_path: str, meta_path: str, model_name: str = "BAAI/bge-base-en-v1.5"):
+    def __init__(self, index_path: str, meta_path: str, model_name: str = "all-MiniLM-L6-v2"):
         self.model = SentenceTransformer(model_name)
         self.faiss_index = faiss.read_index(index_path)
         with open(meta_path, "r", encoding="utf-8") as f:

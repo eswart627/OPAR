@@ -32,7 +32,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 
 class HybridStore:
-    def __init__(self, model_name: str = "BAAI/bge-base-en-v1.5"):
+    def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
         self.model_name = model_name
         self.model = SentenceTransformer(self.model_name)
         self.faiss_index = None
@@ -41,7 +41,7 @@ class HybridStore:
 
     def build_and_save(self, records: List[Tuple[str, str, Dict[str, Any]]], index_path: str, meta_path: str, bm25_path: str):
         texts = [content for _, content, _ in records]
-        print(f"[HybridStore] Encoding {len(texts)} documents with {self.model_name} (768 dims)...")
+        print(f"[HybridStore] Encoding {len(texts)} documents with {self.model_name} (384 dims)...")
         embeddings = self.model.encode(texts, batch_size=32, show_progress_bar=True, convert_to_numpy=True)
         embeddings = np.asarray(embeddings, dtype=np.float32)
 
@@ -70,7 +70,7 @@ class HybridStore:
 
 
 class DenseFAISSStore:
-    def __init__(self, model_name: str = "BAAI/bge-base-en-v1.5"):
+    def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
         self.model_name = model_name
         self.model = SentenceTransformer(self.model_name)
         self.faiss_index = None
@@ -78,7 +78,7 @@ class DenseFAISSStore:
 
     def build_and_save(self, records: List[Tuple[str, str, Dict[str, Any]]], index_path: str, meta_path: str):
         texts = [content for _, content, _ in records]
-        print(f"[DenseStore] Encoding {len(texts)} documents with {self.model_name} (768 dims)...")
+        print(f"[DenseStore] Encoding {len(texts)} documents with {self.model_name} (384 dims)...")
         embeddings = self.model.encode(texts, batch_size=32, show_progress_bar=True, convert_to_numpy=True)
         embeddings = np.asarray(embeddings, dtype=np.float32)
 

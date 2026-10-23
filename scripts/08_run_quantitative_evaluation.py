@@ -1,4 +1,4 @@
-import os, sys, json, time, logging
+import os, sys, json, time, logging, argparse
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -7,7 +7,9 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from src.stores.vector_store import VectorStore
+from src.stores.bm25_store import BM25Store
 from src.stores.metadata_store import MetadataStore
+from src.retrievers.hybrid_retriever import HybridRetriever
 from src.retrievers.permission_retriever import PermissionRetriever, PermissionRetrieverConfig
 from src.managers.credential_manager import CredentialManager
 from src.processors.question_processor import QuestionProcessor
@@ -32,8 +34,18 @@ logging.basicConfig(
 logger = logging.getLogger("RAG_Eval")
 
 def main():
+    parser = argparse.ArgumentParser(description="Permission-Aware RAG Quantitative Evaluation")
+    parser.add_argument(
+        "--mode",
+        choices=["faiss", "hybrid"],
+        default="faiss",
+        help="Retrieval mode: 'faiss' (dense vector only) or 'hybrid' (Weighted RRF with high BM25 weighting)",
+    )
+    args = parser.parse_args()
+    retriever_mode = args.mode.lower()
+
     logger.info("=" * 80)
-    logger.info("STARTING PERMISSION-AWARE RAG 10-QUESTION TEST RUN")
+    logger.info(f"STARTING PERMISSION-AWARE RAG EVALUATION (MODE: {retriever_mode.upper()})")
     logger.info("=" * 80)
 
     ARTIFACTS = "./artifacts"
@@ -41,6 +53,7 @@ def main():
     METADATA_FILE = os.path.join(ARTIFACTS, "metadata.json")
     FAISS_INDEX = os.path.join(ARTIFACTS, "faiss.index")
     FAISS_META  = os.path.join(ARTIFACTS, "faiss_metadata.json")
+    BM25_INDEX  = os.path.join(ARTIFACTS, "bm25.pkl")
     RESULTS_DIR = ROOT_RESULTS_DIR
     PRED_DIR = os.path.join(RESULTS_DIR, "preds")
     GOLD_FILE = os.path.join(ARTIFACTS, "hotpot_dev_distractor_v1.json")
@@ -58,15 +71,32 @@ def main():
     
     # ----- Managers / Stores -----
     user_manager = CredentialManager(base_path=ARTIFACTS, file_name="test_credential.txt")
-    vs = VectorStore(model_name="BAAI/bge-base-en-v1.5")
+    vs = VectorStore(model_name="all-MiniLM-L6-v2")
     vs.load(FAISS_INDEX, FAISS_META)
+
+    bm25 = None
+    if retriever_mode == "hybrid":
+        if not os.path.exists(BM25_INDEX):
+            raise FileNotFoundError(f"BM25 index not found at {BM25_INDEX}. Run 07_run_ingestion_manager.py first.")
+        bm25 = BM25Store()
+        bm25.load(BM25_INDEX)
+
+    # Instantiate HybridRetriever configured for the selected mode
+    active_retriever = HybridRetriever(
+        vector_store=vs,
+        bm25_store=bm25,
+        mode=retriever_mode,
+        bm25_weight=0.75,
+        faiss_weight=0.25,
+        rrf_k=60,
+    )
 
     ms = MetadataStore()
     ms.load(METADATA_FILE)
 
     # ----- Processor + PermissionRetriever -----
     pr = PermissionRetriever(ms, PermissionRetrieverConfig(max_workers=1, use_cache=USE_CACHE))
-    qp = QuestionProcessor(QUESTION_FILE, METADATA_FILE, vs, user_manager, permission_retriever=pr)
+    qp = QuestionProcessor(QUESTION_FILE, METADATA_FILE, active_retriever, user_manager, permission_retriever=pr)
     qp.sample_questions(sample_size=SAMPLE_SIZE, seed=42)
 
     summary_rows = []
@@ -89,28 +119,50 @@ def main():
             top_k=TOP_K,
             max_workers=MAX_WORKERS,
             question_concurrency=QUESTION_CONCURRENCY,
-            use_permission_cache=USE_CACHE,
         )
-        t1 = time.time()
-        print(f"[INFO] run_for_qualitative elapsed: {t1 - t0:.2f}s")
 
-        agg = result["aggregate"]
-        print(f"- PermCov: {agg['PermissionCoverage_pct']:.2f}% | "
-              f"AccessMatch: {agg['AccessMatch']} | "
-              f"TP/FP/FN/TN: {agg['TP']}/{agg['FP']}/{agg['FN']}/{agg['TN']} | "
-              f"Docs: {agg['total_authorized']}/{agg['total_retrieved']} auth/retr")
+        elapsed = time.time() - t0
+        print(f"[INFO] run_for_quantitative elapsed: {elapsed:.2f}s")
+
+        aggregate = result.get("aggregate", {})
+        by_question = result.get("by_question", [])
+
+        preds = {
+            "answer": {q["question_id"]: q["predicted_answer"] for q in by_question},
+            "sp": {}
+        }
+        preds_file = os.path.join(PRED_DIR, f"preds_{user_name}.json")
+        with open(preds_file, "w", encoding="utf-8") as f:
+            json.dump(preds, f, indent=2, ensure_ascii=False)
+
+        access_match = (aggregate.get("AccessMatch") == "PASS")
+        perm_cov_pct = aggregate.get("PermissionCoverage_pct", 0.0)
+        tp = aggregate.get("TP", 0)
+        fp = aggregate.get("FP", 0)
+        fn = aggregate.get("FN", 0)
+        tn = aggregate.get("TN", 0)
+        tot_auth = aggregate.get("total_authorized", 0)
+        tot_retr = aggregate.get("total_retrieved", 0)
+        match_str = aggregate.get("AccessMatch", "FAIL")
+
+        print(
+            f"- PermCov: {perm_cov_pct:.2f}% | "
+            f"AccessMatch: {match_str} | "
+            f"TP/FP/FN/TN: {tp}/{fp}/{fn}/{tn} | "
+            f"Docs: {tot_auth}/{tot_retr} auth/retr\n"
+        )
 
         row = {
             "user": user_name,
-            "top_k": TOP_K,
-            "max_workers": MAX_WORKERS,
-            "use_cache": USE_CACHE,
-            "PermissionCoverage_pct": agg["PermissionCoverage_pct"],
-            "AccessMatch": agg["AccessMatch"],
-            "TP": agg["TP"], "FP": agg["FP"], "FN": agg["FN"], "TN": agg["TN"],
-            "total_retrieved": agg["total_retrieved"],
-            "total_authorized": agg["total_authorized"],
-            "elapsed_sec": round(t1 - t0, 2),
+            "PermissionCoverage": perm_cov_pct / 100.0,
+            "PermissionCoverage_pct": perm_cov_pct,
+            "AccessMatch": access_match,
+            "TP": tp,
+            "FP": fp,
+            "FN": fn,
+            "TN": tn,
+            "total_authorized": tot_auth,
+            "total_retrieved": tot_retr,
             "em": None,
             "f1": None,
             "em_admin": None,
@@ -118,96 +170,81 @@ def main():
         summary_rows.append(row)
         summary_index[user_name] = row
 
-        details_all.append({
-            "config": {"user": user_name, "top_k": TOP_K, "max_workers": MAX_WORKERS, "use_cache": USE_CACHE},
-            "result": result,
-        })
-
-        pred_map = {}
-        for q in result["by_question"]:
-            qid = q["question_id"]
-            pred_answer = (q.get("predicted_answer") or "").strip()
-            if not pred_answer:
-                pred_answer = "I don't know."
-            pred_map[qid] = pred_answer
-
-        pred_obj = {
-            "answer": pred_map,
-            "sp": {}
-        }
-        with open(os.path.join(PRED_DIR, f"preds_{user_name}.json"), "w", encoding="utf-8") as f:
-            json.dump(pred_obj, f, indent=2, ensure_ascii=False)
+        details_all.append(
+            {
+                "user": user_name,
+                "metrics": aggregate,
+                "questions": by_question,
+            }
+        )
 
     t_perm_check_end = time.time()
-    print(f"\n[TIMER] Permission checking and prediction generation took: {t_perm_check_end - t_perm_check_start:.2f}s")
+    print(f"[TIMER] Permission checking and prediction generation took: {t_perm_check_end - t_perm_check_start:.2f}s")
 
+    # ----- HotpotQA Evaluation (em, f1, em_admin) -----
     t_eval_start = time.time()
+    ADMIN_USER = "baseline-admin"
+    admin_pred_file = os.path.join(PRED_DIR, f"preds_{ADMIN_USER}.json")
 
-    admin_file = None
-    for fname in os.listdir(PRED_DIR):
-        if fname.endswith(".json") and "baseline-admin" in fname:
-            admin_file = os.path.join(PRED_DIR, fname)
-            break
-
-    for fname in sorted(os.listdir(PRED_DIR)):
-        if not fname.endswith(".json"):
+    for user_name in user_manager.users.keys():
+        if user_name not in TARGET_USERS:
             continue
-        pred_path = os.path.join(PRED_DIR, fname)
-        base = os.path.splitext(fname)[0]
-        user_from_file = base.replace("preds_", "", 1)
+
+        pred_file = os.path.join(PRED_DIR, f"preds_{user_name}.json")
+        if not os.path.exists(pred_file):
+            continue
 
         try:
-            metrics = hp_eval(
-                prediction_file=pred_path,
-                gold_file=GOLD_FILE,
-                admin_prediction_file=admin_file
-            )
-            if user_from_file in summary_index:
-                summary_index[user_from_file]["em"] = round(metrics.get("em", 0.0), 4)
-                summary_index[user_from_file]["f1"] = round(metrics.get("f1", 0.0), 4)
-                if "em_admin" in metrics:
-                    summary_index[user_from_file]["em_admin"] = round(metrics["em_admin"], 4)
+            eval_res = hp_eval(pred_file, GOLD_FILE, admin_prediction_file=admin_pred_file)
+            em = float(eval_res.get("em", 0.0))
+            f1 = float(eval_res.get("f1", 0.0))
+            em_admin = float(eval_res.get("em_admin", 0.0))
 
-            print(f"[INFO] evaluated {fname} -> em={metrics.get('em'):.4f}, "
-                  f"f1={metrics.get('f1'):.4f}, "
-                  f"em_admin={metrics.get('em_admin', 0.0):.4f}")
+            if user_name in summary_index:
+                summary_index[user_name]["em"] = em
+                summary_index[user_name]["f1"] = f1
+                summary_index[user_name]["em_admin"] = em_admin
+
+            print(f"[INFO] evaluated {os.path.basename(pred_file)} -> em={em:.4f}, f1={f1:.4f}, em_admin={em_admin:.4f}")
         except Exception as e:
-            print(f"[ERROR] Failed to evaluate {fname}: {e}")
+            print(f"[WARN] Failed to evaluate {pred_file}: {e}")
 
     t_eval_end = time.time()
     print(f"[TIMER] Final evaluation (EM, F1, EM@Admin) took: {t_eval_end - t_eval_start:.2f}s\n")
-    
+
+    # ----- Summary table to console -----
+    print(
+        f"[SUMMARY] "
+        f"{[{'user': r['user'], 'PermCov': r['PermissionCoverage_pct'], 'Match': 'PASS' if r['AccessMatch'] else 'FAIL', 'EM': r['em'], 'F1': r['f1'], 'EM@Admin': r['em_admin']} for r in summary_rows]}"
+    )
+
     # ----- Save outputs -----
-    quick = [
-    {
-        'user': r.get('user'),
-        'PermCov': round(r.get('PermissionCoverage_pct', 0.0), 2),
-        'Match': 'PASS' if r.get('AccessMatch') else 'FAIL',
-        'EM': r.get('em'),
-        'F1': r.get('f1'),
-        'EM@Admin': r.get('em_admin')
-    } for r in summary_rows
-    ]
-    print('[SUMMARY]', quick)
-    
+    with open(os.path.join(RESULTS_DIR, f"quantitative_summary_{retriever_mode}.json"), "w", encoding="utf-8") as f:
+        json.dump(summary_rows, f, indent=2, ensure_ascii=False)
+
+    with open(os.path.join(RESULTS_DIR, f"quantitative_details_{retriever_mode}.json"), "w", encoding="utf-8") as f:
+        json.dump(details_all, f, indent=2, ensure_ascii=False)
+
+    # Save default names for compatibility
     with open(os.path.join(RESULTS_DIR, "quantitative_summary.json"), "w", encoding="utf-8") as f:
-        json.dump(quick, f, indent=2, ensure_ascii=False)
+        json.dump(summary_rows, f, indent=2, ensure_ascii=False)
     with open(os.path.join(RESULTS_DIR, "quantitative_details.json"), "w", encoding="utf-8") as f:
         json.dump(details_all, f, indent=2, ensure_ascii=False)
 
     # ----- Formatted Metrics Table (test_metrics.txt) -----
     total_time = round(t_eval_end - t_perm_check_start, 2)
     num_questions = len(qp.sampled_questions or qp.questions)
+    retriever_label = "FAISS (all-MiniLM-L6-v2, 384-dim)" if retriever_mode == "faiss" else "Hybrid (0.75 BM25 + 0.25 FAISS 384-dim, RRF)"
     metric_table_lines = [
         "=" * 105,
-        "                    PERMISSION-AWARE RAG: EXPERIMENT TEST METRICS SUMMARY",
+        f"        PERMISSION-AWARE RAG: EXPERIMENT TEST METRICS SUMMARY (MODE: {retriever_mode.upper()})",
         "=" * 105,
         "Experiment Details:",
         f"  - Questions Tested:    {num_questions}",
         f"  - Top-k Retrieved:     {TOP_K}",
         f"  - Concurrency:         {QUESTION_CONCURRENCY} worker(s)",
         f"  - Target Users:        {', '.join(sorted(TARGET_USERS))}",
-        f"  - Vector Store:        FAISS (BAAI/bge-base-en-v1.5, 768-dim)",
+        f"  - Retriever Mode:      {retriever_label}",
         f"  - LLM Backend:         Gemini Fallback Engine (models.ini)",
         f"  - Total Elapsed Time:  {total_time}s",
         "-" * 105,
@@ -240,8 +277,10 @@ def main():
     ])
 
     metrics_text = "\n".join(metric_table_lines)
-    metrics_path = os.path.join(RESULTS_DIR, "test_metrics.txt")
+    metrics_path = os.path.join(RESULTS_DIR, f"test_metrics_{retriever_mode}.txt")
     with open(metrics_path, "w", encoding="utf-8") as f:
+        f.write(metrics_text)
+    with open(os.path.join(RESULTS_DIR, "test_metrics.txt"), "w", encoding="utf-8") as f:
         f.write(metrics_text)
     
     logger.info("\n" + metrics_text)
@@ -250,41 +289,45 @@ def main():
     # ----- Human-readable Text Report -----
     report_lines = [
         "=" * 80,
-        "PERMISSION-AWARE RAG: DETAILED EVALUATION REPORT",
+        f"PERMISSION-AWARE RAG: DETAILED EVALUATION REPORT (MODE: {retriever_mode.upper()})",
         "=" * 80,
         "",
     ]
-    for item in details_all:
-        uname = item["config"]["user"]
-        result = item["result"]
+
+    for user_block in details_all:
+        user_name = user_block["user"]
         report_lines.append("=" * 80)
-        report_lines.append(f"USER EVALUATION: {uname}")
+        report_lines.append(f"USER EVALUATION: {user_name}")
         report_lines.append("=" * 80)
         report_lines.append("")
 
-        for idx, q_info in enumerate(result.get("by_question", [])):
-            qtext = q_info.get("question", "")
-            pred_ans = q_info.get("predicted_answer", "")
+        questions = user_block["questions"]
+        for idx, q_info in enumerate(questions):
+            qtext = q_info["question"]
             gold_ans = q_info.get("gold_answer", "")
+            pred_ans = q_info.get("predicted_answer", "")
             retrieved_docs = q_info.get("retrieved_docs", [])
-            accessed_docs = q_info.get("accessed_docs", [])
+            accessed_docs = q_info.get("accessed_docs") or q_info.get("authorized_docs", [])
             denied_docs = q_info.get("denied_docs", [])
+            supporting_docs = q_info.get("supporting_docs", [])
 
-            p_lower = pred_ans.strip().lower()
-            g_lower = gold_ans.strip().lower()
-            if g_lower in p_lower or p_lower in g_lower:
+            if not accessed_docs:
+                match_str = "BLOCKED (ACCESS DENIED - ANSWER PREVENTED)"
+            elif pred_ans.strip().lower() == str(gold_ans).strip().lower():
                 match_str = "MATCH (CORRECT)"
-            elif p_lower in ["i don't know.", "i do not know.", "i don't know", "error"]:
+            elif pred_ans == "I don't know.":
                 match_str = "BLOCKED (ACCESS DENIED - ANSWER PREVENTED)"
             else:
                 match_str = "MISMATCH"
 
             report_lines.append(f"[Question {idx + 1}]")
             report_lines.append(f"  QUESTION:                {qtext}")
+            report_lines.append(f"  SUPPORTING DOCS (GOLD):  {', '.join(supporting_docs) if supporting_docs else 'None'}")
             report_lines.append(f"  RETRIEVED DOCS ({len(retrieved_docs)}):")
             for rd in retrieved_docs:
                 st = "ALLOWED" if rd in accessed_docs else "BLOCKED by IAM"
-                report_lines.append(f"    - {rd} [{st}]")
+                sup_tag = " [SUPPORTING DOC]" if rd in supporting_docs else ""
+                report_lines.append(f"    - {rd} [{st}]{sup_tag}")
             report_lines.append(f"  ACCESSED DOCS:           {', '.join(accessed_docs) if accessed_docs else 'None'}")
             report_lines.append(f"  DENIED DOCS:             {', '.join(denied_docs) if denied_docs else 'None'}")
             report_lines.append(f"  LLM PREDICTED ANSWER:    {pred_ans}")
@@ -294,16 +337,14 @@ def main():
             report_lines.append("")
 
     report_text = "\n".join(report_lines)
-    rep_path = os.path.join(RESULTS_DIR, "detailed_evaluation_report.txt")
+    rep_path = os.path.join(RESULTS_DIR, f"detailed_evaluation_report_{retriever_mode}.txt")
     with open(rep_path, "w", encoding="utf-8") as f:
         f.write(report_text)
     
-    os.makedirs("results", exist_ok=True)
-    with open("results/detailed_evaluation_report.txt", "w", encoding="utf-8") as f:
+    with open(os.path.join(RESULTS_DIR, "detailed_evaluation_report.txt"), "w", encoding="utf-8") as f:
         f.write(report_text)
 
     print(f"\n[INFO] Detailed evaluation report saved to: {rep_path}")
-    print(f"[INFO] Also saved to: results/detailed_evaluation_report.txt")
     print("[DONE] Saved qualitative summary, details, and text report.")
 
 if __name__ == "__main__":
