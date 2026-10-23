@@ -4,8 +4,11 @@ oauth2client
 boto3
 tqdm
 google-cloud-storage
+google-cloud-iam
+google-genai
 numpy
 faiss-cpu
 sentence-transformers
 langchain
 ujson
+rank-bm25

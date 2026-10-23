@@ -17,7 +17,12 @@ class GeminiFallbackClient:
     fallback if any model hits quota limits, high traffic, or errors.
     """
     def __init__(self, ini_path: Optional[str] = None):
-        self.ini_path = Path(ini_path or (Path.cwd() / "models.ini"))
+        if ini_path:
+            self.ini_path = Path(ini_path)
+        elif (Path.cwd() / "config" / "models.ini").exists():
+            self.ini_path = Path.cwd() / "config" / "models.ini"
+        else:
+            self.ini_path = Path.cwd() / "models.ini"
         self.api_key = os.environ.get("GOOGLE_GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
         if not self.api_key:
             raise ValueError("GOOGLE_GEMINI_API_KEY not found in environment or .env file.")

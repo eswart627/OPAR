@@ -32,6 +32,7 @@ def generate_question_list() -> None:
                 "id": question_id,
                 "question": question,
                 "gold_answer": gold_answer,
+                "supporting_facts": item.get("supporting_facts", []),
             }
         )
 

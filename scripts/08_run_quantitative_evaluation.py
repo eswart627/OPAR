@@ -14,14 +14,15 @@ from src.retrievers.permission_retriever import PermissionRetriever, PermissionR
 from src.managers.credential_manager import CredentialManager
 from src.processors.question_processor import QuestionProcessor
 
-from artifacts.hotpot_evaluate_with_em_admin import eval as hp_eval
+from scripts.helpers.hotpot_evaluate_with_em_admin import eval as hp_eval
 
 load_dotenv()
 
 # Setup root results directory and logger
 ROOT_RESULTS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "results"))
-os.makedirs(ROOT_RESULTS_DIR, exist_ok=True)
-log_file_path = os.path.join(ROOT_RESULTS_DIR, "test_execution.log")
+LOGS_DIR = os.path.join(ROOT_RESULTS_DIR, "logs")
+os.makedirs(LOGS_DIR, exist_ok=True)
+log_file_path = os.path.join(LOGS_DIR, "test_execution.log")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -49,12 +50,13 @@ def main():
     logger.info("=" * 80)
 
     ARTIFACTS = "./artifacts"
+    VECTOR_DB = "./vector_db"
     QUESTION_FILE = os.path.join(ARTIFACTS, "question_list.json")
     METADATA_FILE = os.path.join(ARTIFACTS, "metadata.json")
-    FAISS_INDEX = os.path.join(ARTIFACTS, "faiss.index")
-    FAISS_META  = os.path.join(ARTIFACTS, "faiss_metadata.json")
-    BM25_INDEX  = os.path.join(ARTIFACTS, "bm25.pkl")
-    RESULTS_DIR = ROOT_RESULTS_DIR
+    FAISS_INDEX = os.path.join(VECTOR_DB, "faiss.index")
+    FAISS_META  = os.path.join(VECTOR_DB, "faiss_metadata.json")
+    BM25_INDEX  = os.path.join(VECTOR_DB, "bm25.pkl")
+    RESULTS_DIR = os.path.join(ROOT_RESULTS_DIR, retriever_mode)
     PRED_DIR = os.path.join(RESULTS_DIR, "preds")
     GOLD_FILE = os.path.join(ARTIFACTS, "hotpot_dev_distractor_v1.json")
 
@@ -218,17 +220,13 @@ def main():
         f"{[{'user': r['user'], 'PermCov': r['PermissionCoverage_pct'], 'Match': 'PASS' if r['AccessMatch'] else 'FAIL', 'EM': r['em'], 'F1': r['f1'], 'EM@Admin': r['em_admin']} for r in summary_rows]}"
     )
 
-    # ----- Save outputs -----
-    with open(os.path.join(RESULTS_DIR, f"quantitative_summary_{retriever_mode}.json"), "w", encoding="utf-8") as f:
+    # ----- Save outputs into mode-specific directory (results/<mode>/) -----
+    summary_file = os.path.join(RESULTS_DIR, "quantitative_summary.json")
+    with open(summary_file, "w", encoding="utf-8") as f:
         json.dump(summary_rows, f, indent=2, ensure_ascii=False)
 
-    with open(os.path.join(RESULTS_DIR, f"quantitative_details_{retriever_mode}.json"), "w", encoding="utf-8") as f:
-        json.dump(details_all, f, indent=2, ensure_ascii=False)
-
-    # Save default names for compatibility
-    with open(os.path.join(RESULTS_DIR, "quantitative_summary.json"), "w", encoding="utf-8") as f:
-        json.dump(summary_rows, f, indent=2, ensure_ascii=False)
-    with open(os.path.join(RESULTS_DIR, "quantitative_details.json"), "w", encoding="utf-8") as f:
+    details_file = os.path.join(RESULTS_DIR, "quantitative_details.json")
+    with open(details_file, "w", encoding="utf-8") as f:
         json.dump(details_all, f, indent=2, ensure_ascii=False)
 
     # ----- Formatted Metrics Table (test_metrics.txt) -----
@@ -277,10 +275,8 @@ def main():
     ])
 
     metrics_text = "\n".join(metric_table_lines)
-    metrics_path = os.path.join(RESULTS_DIR, f"test_metrics_{retriever_mode}.txt")
+    metrics_path = os.path.join(RESULTS_DIR, "test_metrics.txt")
     with open(metrics_path, "w", encoding="utf-8") as f:
-        f.write(metrics_text)
-    with open(os.path.join(RESULTS_DIR, "test_metrics.txt"), "w", encoding="utf-8") as f:
         f.write(metrics_text)
     
     logger.info("\n" + metrics_text)
@@ -337,11 +333,8 @@ def main():
             report_lines.append("")
 
     report_text = "\n".join(report_lines)
-    rep_path = os.path.join(RESULTS_DIR, f"detailed_evaluation_report_{retriever_mode}.txt")
+    rep_path = os.path.join(RESULTS_DIR, "detailed_evaluation_report.txt")
     with open(rep_path, "w", encoding="utf-8") as f:
-        f.write(report_text)
-    
-    with open(os.path.join(RESULTS_DIR, "detailed_evaluation_report.txt"), "w", encoding="utf-8") as f:
         f.write(report_text)
 
     print(f"\n[INFO] Detailed evaluation report saved to: {rep_path}")

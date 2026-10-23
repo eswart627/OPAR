@@ -17,7 +17,8 @@ def sanitize_filename(title: str) -> str:
 class IngestionConfig:
     storage_map_path: str = "file_to_storage_info.json"
     hotpot_file_path: str = "hotpot_dev_distractor_v1.json"
-    output_dir: str = "artifacts"
+    output_dir: str = "artifacts",
+    vector_db_dir: str = "vector_db"
     faiss_index_name: str = "faiss.index"
     faiss_meta_name: str = "faiss_metadata.json"
     bm25_index_name: str = "bm25.pkl"
@@ -44,13 +45,14 @@ class IngestionManager:
         print("Building FAISS index from records...")
         self.vector_store.build_from_records(records)
 
-        index_path = os.path.join(self.cfg.output_dir, self.cfg.faiss_index_name)
-        vecmeta_path = os.path.join(self.cfg.output_dir, self.cfg.faiss_meta_name)
+        os.makedirs(self.cfg.vector_db_dir, exist_ok=True)
+        index_path = os.path.join(self.cfg.vector_db_dir, self.cfg.faiss_index_name)
+        vecmeta_path = os.path.join(self.cfg.vector_db_dir, self.cfg.faiss_meta_name)
         self.vector_store.save(index_path, vecmeta_path)
 
         print("Building BM25 index from records...")
         self.bm25_store.build_from_records(records)
-        bm25_path = os.path.join(self.cfg.output_dir, self.cfg.bm25_index_name)
+        bm25_path = os.path.join(self.cfg.vector_db_dir, self.cfg.bm25_index_name)
         self.bm25_store.save(bm25_path)
 
         access_meta = [meta for _, _, meta in records]
