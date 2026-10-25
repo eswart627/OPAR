@@ -1,10 +1,10 @@
 # web/routes/status_routes.py
-# Blueprint for system health, cloud state, and active dataset status
+# Blueprint for system health, cloud state, active dataset status, and cache management
 
 import os
 import json
 import logging
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from web.services.pipeline_service import PipelineService
 
 logger = logging.getLogger("RAG_Web_StatusRoutes")
@@ -51,11 +51,16 @@ def get_status():
         "metadata": os.path.exists(os.path.join(service.artifacts_dir, "metadata.json")),
     }
 
+    cache_stats = None
+    if service.permission_retriever and hasattr(service.permission_retriever, "get_cache_stats"):
+        cache_stats = service.permission_retriever.get_cache_stats()
+
     return jsonify({
         "status": "online",
         "is_ready": service.is_ready,
         "dataset": dataset_info,
         "indices": indices,
+        "cache_stats": cache_stats,
         "supported_modes": ["hybrid", "faiss"],
         "users": [
             {"id": "user-1", "name": "Restricted Persona", "clearance": "0% Access", "badge_class": "badge-danger", "desc": "All Cloud Storage Blocked"},
@@ -63,3 +68,33 @@ def get_status():
             {"id": "baseline-admin", "name": "Enterprise Admin", "clearance": "100% Access", "badge_class": "badge-success", "desc": "Full Unrestricted Access"},
         ]
     })
+
+@status_bp.route("/cache/stats", methods=["GET"])
+def get_cache_stats():
+    service = PipelineService.get_instance()
+    if not service.permission_retriever:
+        return jsonify({"error": "Permission retriever not initialized"}), 503
+    return jsonify(service.permission_retriever.get_cache_stats())
+
+@status_bp.route("/cache/invalidate", methods=["POST"])
+def invalidate_cache():
+    """
+    Webhook / Admin endpoint to invalidate cache entries:
+    Payload: {"user": "user-1"} -> invalidates specific user
+    Payload: {"all": true} -> clears full cache
+    """
+    service = PipelineService.get_instance()
+    if not service.permission_retriever:
+        return jsonify({"error": "Permission retriever not initialized"}), 503
+
+    payload = request.get_json() or {}
+    if payload.get("all"):
+        purged = service.permission_retriever.clear_cache()
+        return jsonify({"status": "cleared_all", "purged_count": purged})
+
+    user = payload.get("user")
+    if user:
+        purged = service.permission_retriever.invalidate_user(user)
+        return jsonify({"status": "user_invalidated", "user": user, "purged_count": purged})
+
+    return jsonify({"error": "Specify 'user' or 'all': true"}), 400
