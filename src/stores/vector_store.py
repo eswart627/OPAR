@@ -1,4 +1,7 @@
 import os
+os.environ["HF_HUB_OFFLINE"] = "1"
+os.environ["TRANSFORMERS_OFFLINE"] = "1"
+
 import json
 from typing import List, Dict, Any, Tuple, Optional
 
@@ -17,7 +20,10 @@ class VectorStore:
     # -------- internal --------
     def _ensure_model(self):
         if self.model is None:
-            self.model = SentenceTransformer(self.model_name)
+            try:
+                self.model = SentenceTransformer(self.model_name, local_files_only=True)
+            except Exception:
+                self.model = SentenceTransformer(self.model_name)
 
     # -------- build / save --------
     def build_from_records(self, records: List[Tuple[str, str, Dict[str, Any]]]) -> None:

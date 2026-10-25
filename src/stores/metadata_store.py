@@ -7,12 +7,12 @@ from typing import Dict, Any, List, Optional
 
 class MetadataStore:
     """
-    Decoupled Metadata Store backed by SQLite (with seamless JSON fallback).
+    Decoupled Metadata Store backed strictly by SQLite.
     
     Provides:
     - O(1) B-tree indexed lookups by global_uuid and file_name.
     - Atomic single-row location/bucket updates without rewriting vector embeddings or JSON.
-    - 100% backward compatibility with all legacy JSON methods.
+    - Zero dependency on metadata.json.
     """
     def __init__(self):
         self._db_path: Optional[str] = None
@@ -27,24 +27,18 @@ class MetadataStore:
     def is_sqlite(self) -> bool:
         return self._conn is not None
 
-    def load(self, metadata_path: str) -> None:
+    def load(self, metadata_path: str = "artifacts/metadata.db") -> None:
         """
-        Loads metadata. Automatically prefers SQLite if a .db file exists,
-        or seamlessly falls back to legacy JSON.
+        Loads metadata strictly from SQLite database (artifacts/metadata.db).
         """
-        db_candidate = None
-        if metadata_path.endswith(".db") or metadata_path.endswith(".sqlite"):
-            db_candidate = metadata_path
-        else:
-            # If given a .json path, check if corresponding .db exists
-            possible_db = os.path.splitext(metadata_path)[0] + ".db"
-            if os.path.exists(possible_db):
-                db_candidate = possible_db
+        db_path = metadata_path
+        if not (db_path.endswith(".db") or db_path.endswith(".sqlite")):
+            db_path = os.path.splitext(metadata_path)[0] + ".db"
 
-        if db_candidate and os.path.exists(db_candidate):
-            self._init_sqlite(db_candidate)
-        else:
-            self._init_json(metadata_path)
+        if not os.path.exists(db_path):
+            raise FileNotFoundError(f"SQLite metadata database not found at: {db_path}")
+
+        self._init_sqlite(db_path)
 
     def _init_sqlite(self, db_path: str) -> None:
         self._db_path = db_path
@@ -74,13 +68,6 @@ class MetadataStore:
             self._all = all_records
             self._by_uuid = by_uuid
             self._by_file = by_file
-
-    def _init_json(self, json_path: str) -> None:
-        with open(json_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        self._all = data
-        self._by_uuid = {m["global_uuid"]: m for m in data if "global_uuid" in m}
-        self._by_file = {m["file_name"]: m for m in data if "file_name" in m}
 
     def get_by_uuid(self, uuid: str) -> Optional[Dict[str, Any]]:
         if not uuid:
@@ -127,7 +114,7 @@ class MetadataStore:
     ) -> bool:
         """
         Decoupled single-row atomic update:
-        Updates the physical cloud pointer (bucket/path/provider) for a UUID
+        Updates the physical cloud pointer (bucket/path/provider) for a UUID in SQLite
         WITHOUT requiring any vector re-embedding or JSON file rewriting.
         """
         rec = self.get_by_uuid(uuid)

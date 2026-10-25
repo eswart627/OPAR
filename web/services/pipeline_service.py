@@ -66,7 +66,7 @@ class PipelineService:
                 self.bm25_store = BM25Store()
                 self.bm25_store.load(bm25_index)
 
-            meta_file = os.path.join(self.artifacts_dir, "metadata.json")
+            meta_file = os.path.join(self.artifacts_dir, "metadata.db")
             if os.path.exists(meta_file):
                 self.metadata_store = MetadataStore()
                 self.metadata_store.load(meta_file)

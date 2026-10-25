@@ -2,6 +2,7 @@ import os
 import json
 import uuid
 import re
+import sqlite3
 from dataclasses import dataclass
 from typing import Dict, Any, List, Tuple
 
@@ -17,12 +18,12 @@ def sanitize_filename(title: str) -> str:
 class IngestionConfig:
     storage_map_path: str = "file_to_storage_info.json"
     hotpot_file_path: str = "hotpot_dev_distractor_v1.json"
-    output_dir: str = "artifacts",
+    output_dir: str = "artifacts"
     vector_db_dir: str = "vector_db"
     faiss_index_name: str = "faiss.index"
     faiss_meta_name: str = "faiss_metadata.json"
     bm25_index_name: str = "bm25.pkl"
-    metadata_name: str = "metadata.json"
+    metadata_name: str = "metadata.db"
     embedding_model: str = "all-MiniLM-L6-v2"
     gcp_endpoint: str = "https://storage.googleapis.com"
     aws_endpoint: str = "https://s3.ap-northeast-2.amazonaws.com"
@@ -55,18 +56,57 @@ class IngestionManager:
         bm25_path = os.path.join(self.cfg.vector_db_dir, self.cfg.bm25_index_name)
         self.bm25_store.save(bm25_path)
 
+        # Build SQLite metadata.db directly (NO JSON DUMP)
         access_meta = [meta for _, _, meta in records]
-        meta_path = os.path.join(self.cfg.output_dir, self.cfg.metadata_name)
-        with open(meta_path, "w", encoding="utf-8") as f:
-            json.dump(access_meta, f, indent=2, ensure_ascii=False)
-        print(f"Saved access metadata to {meta_path}")
-        print("\nDual ingestion (FAISS + BM25) complete.")
+        db_path = os.path.join(self.cfg.output_dir, self.cfg.metadata_name)
+        if not db_path.endswith(".db") and not db_path.endswith(".sqlite"):
+            db_path = os.path.splitext(db_path)[0] + ".db"
+
+        if os.path.exists(db_path):
+            os.remove(db_path)
+
+        conn = sqlite3.connect(db_path)
+        cur = conn.cursor()
+        cur.execute("""
+        CREATE TABLE metadata (
+            global_uuid TEXT PRIMARY KEY,
+            file_name TEXT NOT NULL,
+            provider TEXT NOT NULL,
+            bucket TEXT NOT NULL,
+            region TEXT,
+            endpoint TEXT,
+            raw_json TEXT NOT NULL
+        );
+        """)
+        cur.execute("CREATE INDEX idx_file_name ON metadata(file_name);")
+        cur.execute("CREATE INDEX idx_bucket ON metadata(bucket);")
+
+        for r in access_meta:
+            uid = r.get("global_uuid")
+            fname = r.get("file_name", "")
+            provider = (r.get("provider") or "").lower()
+            params = r.get("parameters") or {}
+            bucket = params.get("bucket", "")
+            region = params.get("region", "")
+            endpoint = r.get("endpoint", "")
+            raw_json = json.dumps(r, ensure_ascii=False)
+
+            cur.execute("""
+            INSERT OR REPLACE INTO metadata (
+                global_uuid, file_name, provider, bucket, region, endpoint, raw_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (uid, fname, provider, bucket, region, endpoint, raw_json))
+
+        conn.commit()
+        conn.close()
+        print(f"Saved access metadata directly to SQLite DB: {db_path}")
+        print("\nDual ingestion (FAISS + BM25) and SQLite Metadata complete.")
 
         return {
             "faiss_index": index_path,
             "faiss_metadata": vecmeta_path,
             "bm25_index": bm25_path,
-            "metadata": meta_path,
+            "metadata": db_path,
         }
 
     def _load_json(self, path: str) -> Any:

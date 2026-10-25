@@ -48,7 +48,7 @@ def get_status():
     indices = {
         "faiss": os.path.exists(os.path.join(service.vector_db_dir, "faiss.index")),
         "bm25": os.path.exists(os.path.join(service.vector_db_dir, "bm25.pkl")),
-        "metadata": os.path.exists(os.path.join(service.artifacts_dir, "metadata.json")),
+        "metadata": os.path.exists(os.path.join(service.artifacts_dir, "metadata.db")),
     }
 
     cache_stats = None

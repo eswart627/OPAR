@@ -13,9 +13,10 @@ load_dotenv()
 def main():
     ARTIFACTS = "./artifacts"
     QUESTION_FILE = os.path.join(ARTIFACTS, "question_list.json")
-    METADATA_FILE = os.path.join(ARTIFACTS, "metadata.json")
-    FAISS_INDEX = os.path.join(ARTIFACTS, "faiss.index")
-    FAISS_META  = os.path.join(ARTIFACTS, "faiss_metadata.json")
+    METADATA_FILE = os.path.join(ARTIFACTS, "metadata.db")
+    VECTOR_DB = "./vector_db"
+    FAISS_INDEX = os.path.join(VECTOR_DB, "faiss.index") if os.path.exists(os.path.join(VECTOR_DB, "faiss.index")) else os.path.join(ARTIFACTS, "faiss.index")
+    FAISS_META  = os.path.join(VECTOR_DB, "faiss_metadata.json") if os.path.exists(os.path.join(VECTOR_DB, "faiss_metadata.json")) else os.path.join(ARTIFACTS, "faiss_metadata.json")
     RESULTS_DIR = os.path.join(ARTIFACTS, "results")
     os.makedirs(RESULTS_DIR, exist_ok=True)
     

@@ -9,7 +9,7 @@ project_root = str(Path(__file__).resolve().parent.parent)
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from scripts.cleanup_resources import cleanup_aws, load_model
+from scripts.ops.cleanup_resources import cleanup_aws, load_model
 
 if __name__ == "__main__":
     print("="*60)

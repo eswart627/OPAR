@@ -88,10 +88,9 @@ def run_test():
     assert len(errors) == 0, f"Concurrency errors occurred: {errors[:5]}"
     print("  Zero database lock errors, zero exceptions under concurrent load.")
 
-    # Reset any test bucket changes
-    from scripts.migrate_metadata_to_sqlite import migrate
-    json_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "artifacts", "metadata.json"))
-    migrate(json_path, db_path)
+    # Reset any test bucket changes by restoring original buckets
+    for r in all_recs:
+        ms.update_location(r["global_uuid"], new_bucket=(r.get("parameters") or {}).get("bucket"))
     print("  Restored clean baseline state in SQLite.")
 
     print("\n>>> TEST 3 PASSED: Adversarial lookups, injection attempts, and concurrency stress verified.")

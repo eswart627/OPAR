@@ -40,13 +40,14 @@ def main():
         "--mode",
         choices=["faiss", "hybrid"],
         default="faiss",
+        help="Retrieval mode: 'faiss' (dense vector only) or 'hybrid' (Weighted RRF with high BM25 weighting)",
     )
     parser.add_argument(
         "--top_k",
         type=int,
         default=5,
         help="Top-k retrieved documents",
-        help="Retrieval mode: 'faiss' (dense vector only) or 'hybrid' (Weighted RRF with high BM25 weighting)",
+
     )
     args = parser.parse_args()
     retriever_mode = args.mode.lower()
@@ -58,7 +59,7 @@ def main():
     ARTIFACTS = "./artifacts"
     VECTOR_DB = "./vector_db"
     QUESTION_FILE = os.path.join(ARTIFACTS, "question_list.json")
-    METADATA_FILE = os.path.join(ARTIFACTS, "metadata.json")
+    METADATA_FILE = os.path.join(ARTIFACTS, "metadata.db")
     FAISS_INDEX = os.path.join(VECTOR_DB, "faiss.index")
     FAISS_META  = os.path.join(VECTOR_DB, "faiss_metadata.json")
     BM25_INDEX  = os.path.join(VECTOR_DB, "bm25.pkl")
