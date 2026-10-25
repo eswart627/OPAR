@@ -6,7 +6,10 @@ from dotenv import load_dotenv
 CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
 ROOT_DIR = Path(__file__).resolve().parent.parent
 
-if (CONFIG_DIR / ".env").exists():
-    load_dotenv(dotenv_path=CONFIG_DIR / ".env", override=False)
-if (ROOT_DIR / ".env").exists():
-    load_dotenv(dotenv_path=ROOT_DIR / ".env", override=False)
+def load_project_env():
+    if (CONFIG_DIR / ".env").exists():
+        load_dotenv(dotenv_path=CONFIG_DIR / ".env", override=False)
+    if (ROOT_DIR / ".env").exists():
+        load_dotenv(dotenv_path=ROOT_DIR / ".env", override=False)
+
+load_project_env()

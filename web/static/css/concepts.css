@@ -1,0 +1,249 @@
+/* concepts.css
+ * HCI Educational Hub: Concept Models, Mathematical Scoring, and Architecture Diagrams
+ */
+
+.concepts-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  height: calc(100vh - 120px);
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.concepts-hero {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  box-shadow: var(--shadow-card);
+}
+
+.concepts-hero-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.concepts-hero-subtitle {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* 2x2 Concept Grid */
+.concepts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 1024px) {
+  .concepts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.concept-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: var(--shadow-card);
+}
+
+.concept-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 10px;
+}
+
+.concept-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.concept-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-accent);
+  color: var(--text-secondary);
+}
+
+.concept-body {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* Scoring Comparison Subgrid */
+.scoring-comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.scoring-box {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.scoring-box-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  justify-content: space-between;
+}
+
+.scoring-box-cap {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: #0369a1;
+  background: #e0f2fe;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.scoring-formula {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: #ffffff;
+  border: 1px solid var(--border-subtle);
+  padding: 4px 8px;
+  border-radius: 4px;
+  color: var(--text-primary);
+  text-align: center;
+}
+
+/* Diagram Containers */
+.diagram-wrapper {
+  background: #ffffff;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
+
+.diagram-svg {
+  width: 100%;
+  max-width: 520px;
+  height: auto;
+}
+
+/* Metrics Glossary Grid */
+.metrics-glossary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.metric-glossary-item {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+}
+
+.metric-glossary-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.metric-glossary-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* Helper Banner in Query View */
+.helper-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-left: 3px solid #0284c7;
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.helper-banner-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.helper-banner strong {
+  color: var(--text-primary);
+}
+
+.helper-link {
+  color: #0284c7;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+  margin-left: 4px;
+}
+
+.helper-link:hover {
+  color: #0369a1;
+}
+
+/* Enhanced Document Card Score Badge */
+.doc-score-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f1f5f9;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-primary);
+}
+
+.doc-score-bar-bg {
+  width: 44px;
+  height: 5px;
+  background: #e2e8f0;
+  border-radius: 3px;
+  overflow: hidden;
+  display: inline-block;
+}
+
+.doc-score-bar-fill {
+  height: 100%;
+  background: #0284c7;
+  border-radius: 3px;
+}

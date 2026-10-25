@@ -40,6 +40,12 @@ def main():
         "--mode",
         choices=["faiss", "hybrid"],
         default="faiss",
+    )
+    parser.add_argument(
+        "--top_k",
+        type=int,
+        default=5,
+        help="Top-k retrieved documents",
         help="Retrieval mode: 'faiss' (dense vector only) or 'hybrid' (Weighted RRF with high BM25 weighting)",
     )
     args = parser.parse_args()
@@ -64,7 +70,7 @@ def main():
     os.makedirs(PRED_DIR, exist_ok=True)
 
     # ----- Experiment setting -----
-    TOP_K = 5
+    TOP_K = args.top_k
     MAX_WORKERS = 10
     QUESTION_CONCURRENCY = 1
     USE_CACHE = True

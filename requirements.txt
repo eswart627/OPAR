@@ -12,3 +12,4 @@ sentence-transformers
 langchain
 ujson
 rank-bm25
+flask

@@ -1,0 +1,412 @@
+/* audit_ledger.css
+ * Bounded Viewport, Compact Scrolling & Top-K Controls
+ */
+
+.view-panel {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  height: 100%;
+}
+
+/* Two-Column Grid fitted to 100% viewport: Generous responsive proportions */
+.workspace-grid {
+  display: grid;
+  grid-template-columns: 540px 1fr;
+  gap: 16px;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+@media (max-width: 1100px) {
+  .workspace-grid {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+}
+
+/* Left Column & Right Column */
+.panel-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+  overflow: hidden;
+  padding: 14px;
+}
+
+/* Card body inside controls column: Dynamic flex layout that utilizes all vertical space */
+.card-controls-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  padding: 16px;
+  gap: 12px;
+}
+
+/* Persona Selection Cards */
+.persona-group {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.persona-card {
+  padding: 8px 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.12s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.persona-card:hover {
+  background: var(--bg-elevated);
+}
+
+.persona-card.selected {
+  border-color: #0f172a;
+  background: #f8fafc;
+  box-shadow: 0 0 0 1px #0f172a;
+}
+
+.persona-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.persona-desc {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* Configuration Row: Mode Switcher + Top-K Control */
+.config-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.mode-toggle {
+  display: flex;
+  flex: 2;
+  gap: 2px;
+  background: var(--bg-elevated);
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+}
+
+.mode-pill {
+  flex: 1;
+  padding: 6px 8px;
+  text-align: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.mode-pill.selected {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+/* Top-K Slider Control */
+.topk-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+}
+
+.topk-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.topk-slider {
+  width: 100%;
+  accent-color: #0f172a;
+  cursor: pointer;
+}
+
+.topk-value {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  min-width: 16px;
+}
+
+/* Question Preset Cards: Flex-1 to consume available vertical space dynamically */
+.preset-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 250px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px;
+  background: var(--bg-surface);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  margin-bottom: 8px;
+}
+
+.chip-item {
+  padding: 10px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  line-height: 1.45;
+  transition: all 0.12s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.chip-item:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.chip-item.active {
+  border-color: #0f172a;
+  background: #f8fafc;
+  color: #0f172a;
+  font-weight: 600;
+  box-shadow: 0 0 0 1px #0f172a;
+}
+
+/* Custom Query Textarea Box: Prominent & Comfortable */
+.custom-query-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+
+.custom-query-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+.textarea-query {
+  width: 100%;
+  height: 64px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  padding: 8px 10px;
+  font-size: 12.5px;
+  font-family: var(--font-family);
+  resize: none;
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+.textarea-query:focus {
+  outline: none;
+  border-color: #0f172a;
+}
+
+/* Answer Viewport */
+.answer-box {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+
+.answer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.answer-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.gold-answer-box {
+  background: var(--bg-surface-header);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid #0f172a;
+  padding: 6px 10px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* Document Security Audit Cards (Full Height Scrollable Flex Container) */
+.audit-viewport-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  padding: 14px 16px 10px 16px;
+}
+
+.doc-ledger-scrollbox {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-right: 6px;
+  padding-bottom: 20px;
+}
+
+.doc-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: all 0.15s ease;
+}
+
+.doc-card:hover {
+  border-color: #94a3b8;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.doc-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.doc-name {
+  font-family: var(--font-family);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.doc-badges {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.doc-meta {
+  font-size: 11.5px;
+  color: #64748b;
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+
+.doc-snippet {
+  font-size: 12.5px;
+  color: #334155;
+  line-height: 1.6;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  letter-spacing: 0.01em;
+}
+
+/* Metrics Evaluation Matrix View & Scrollable Container */
+.eval-card-container {
+  width: 100%;
+  height: 100%;
+  max-height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.eval-table-scrollbox {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: auto;
+  padding: 4px;
+}
+
+.metrics-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+  text-align: left;
+}
+
+.metrics-table th {
+  position: sticky;
+  top: 0;
+  background: #f8fafc;
+  padding: 12px 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  border-bottom: 2px solid #cbd5e1;
+  z-index: 2;
+}
+
+.metrics-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #e2e8f0;
+  color: var(--text-primary);
+  background: #ffffff;
+}
+
+.metrics-table tr:hover td {
+  background: #f8fafc;
+}
+
+/* File Dropzone */
+.dropzone {
+  border: 2px dashed var(--border-accent);
+  border-radius: var(--radius-sm);
+  padding: 24px;
+  text-align: center;
+  cursor: pointer;
+  background: var(--bg-surface);
+  transition: background 0.15s ease;
+}
+
+.dropzone:hover {
+  background: var(--bg-elevated);
+}
