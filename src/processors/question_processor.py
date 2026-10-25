@@ -14,8 +14,16 @@ class QuestionProcessor:
 
         with open(question_file, "r", encoding="utf-8") as f:
             self.questions: List[Dict[str, Any]] = json.load(f)
-        with open(metadata_file, "r", encoding="utf-8") as f:
-            metadata: List[Dict[str, Any]] = json.load(f)
+        if metadata_file.endswith(".db") or metadata_file.endswith(".sqlite"):
+            import sqlite3
+            conn = sqlite3.connect(metadata_file)
+            cur = conn.cursor()
+            cur.execute("SELECT raw_json FROM metadata")
+            metadata: List[Dict[str, Any]] = [json.loads(r[0]) for r in cur.fetchall()]
+            conn.close()
+        else:
+            with open(metadata_file, "r", encoding="utf-8") as f:
+                metadata: List[Dict[str, Any]] = json.load(f)
 
         self.uuid_to_metadata = {m["global_uuid"]: m for m in metadata}
         self.sampled_questions: Optional[List[Dict[str, Any]]] = None
