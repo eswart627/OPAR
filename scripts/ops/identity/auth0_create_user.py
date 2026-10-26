@@ -20,7 +20,7 @@ AUTH0_DOMAIN = os.environ.get("AUTH0_DOMAIN")
 AUTH0_CLIENT_ID = os.environ.get("AUTH0_CLIENT_ID")
 AUTH0_CLIENT_SECRET = os.environ.get("AUTH0_CLIENT_SECRET")
 CONNECTION_NAME = "Username-Password-Authentication"
-DEFAULT_PASSWORD = "Corporate@Pass2026!"
+DEFAULT_PASSWORD = os.environ.get("AUTH0_DEFAULT_PASSWORD", "Corporate@Pass2026!")
 EMAIL_DOMAIN = "@company.internal"
 
 if not AUTH0_DOMAIN or not AUTH0_CLIENT_ID or not AUTH0_CLIENT_SECRET:

@@ -67,7 +67,7 @@ class CredentialManager:
         gcp_provider_id = os.environ.get("GCP_PROVIDER_ID", "auth0-provider")
         gcp_sa_email = f"gcp-admin@{gcp_project_id}.iam.gserviceaccount.com"
 
-        default_password = "Corporate@Pass2026!"
+        default_password = os.environ.get("AUTH0_DEFAULT_PASSWORD", "Corporate@Pass2026!")
         email_domain = "@company.internal"
 
         sts_client = boto3.client("sts", region_name=aws_region)

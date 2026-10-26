@@ -7,9 +7,9 @@ import configparser
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
-from dotenv import load_dotenv
+from src.env_loader import load_project_env
 
-load_dotenv(dotenv_path=Path.cwd() / ".env", override=True)
+load_project_env()
 
 class GeminiFallbackClient:
     """

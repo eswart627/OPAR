@@ -18,7 +18,6 @@ from scripts.helpers.hotpot_evaluate_with_em_admin import eval as hp_eval
 
 from src.env_loader import load_project_env
 load_project_env()
-load_dotenv(override=True)
 
 # Setup root results directory and logger
 ROOT_RESULTS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "results"))
@@ -57,13 +56,23 @@ def main():
         default=None,
         help="Identity federation bridge mode: 'static' or 'auth0'. Defaults to AUTH_MODE in config/.env.",
     )
+    parser.add_argument(
+        "--cache",
+        action="store_true",
+        default=False,
+        help="Enable in-memory TTL permission decision caching for fast repeated checks. Default: False (live cloud checks)",
+    )
     args = parser.parse_args()
     if args.auth_mode:
         os.environ["AUTH_MODE"] = args.auth_mode.lower()
     retriever_mode = args.mode.lower()
 
+    USE_CACHE = args.cache
+
     logger.info("=" * 80)
     logger.info(f"STARTING PERMISSION-AWARE RAG EVALUATION (MODE: {retriever_mode.upper()})")
+    logger.info(f"PERMISSION CACHE: {'ENABLED (300s TTL)' if USE_CACHE else 'DISABLED (Live Cloud Checks)'}")
+    logger.info(f"AUTH MODE:        {os.environ.get('AUTH_MODE', 'static').upper()}")
     logger.info("=" * 80)
 
     ARTIFACTS = "./artifacts"
@@ -84,7 +93,7 @@ def main():
     TOP_K = args.top_k
     MAX_WORKERS = 10
     QUESTION_CONCURRENCY = 1
-    USE_CACHE = True
+    # USE_CACHE configured above via args.cache
     TARGET_USERS = {"user-1", "user-3", "baseline-admin"}
     SAMPLE_SIZE = 10
     
@@ -138,6 +147,7 @@ def main():
             top_k=TOP_K,
             max_workers=MAX_WORKERS,
             question_concurrency=QUESTION_CONCURRENCY,
+            use_permission_cache=USE_CACHE,
         )
 
         elapsed = time.time() - t0
@@ -260,6 +270,8 @@ def main():
         f"  - Concurrency:         {QUESTION_CONCURRENCY} worker(s)",
         f"  - Target Users:        {', '.join(sorted(TARGET_USERS))}",
         f"  - Retriever Mode:      {retriever_label}",
+        f"  - Permission Cache:    {'Enabled (300s in-memory TTL)' if USE_CACHE else 'Disabled (Live Cloud Checks)'}",
+        f"  - Auth Mode:           {os.environ.get('AUTH_MODE', 'static').upper()}",
         f"  - LLM Backend:         Gemini Fallback Engine (models.ini)",
         f"  - Total Elapsed Time:  {total_time}s",
         "-" * 105,

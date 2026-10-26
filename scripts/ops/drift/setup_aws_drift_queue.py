@@ -36,12 +36,11 @@ def validate_aws_prerequisites():
         errors.append("  - AWS_ADMIN_SECRET_KEY is missing from config/.env")
         
     if not region:
-        print("\n[AWS][NOTICE] 'AWS_REGION' is not explicitly set in config/.env.")
-        print("             Defaulting to 'ap-south-1'.")
-        print("             NOTE: S3 event notifications REQUIRE the SQS queue and S3 buckets")
-        print("             to be located in the EXACT same AWS region. If your buckets are in")
-        print("             another region, set AWS_REGION in config/.env.\n")
-        region = "ap-south-1"
+        errors.append(
+            "  - AWS_REGION is missing from config/.env.\n"
+            "    SQS queues and S3 event notifications strictly require an explicit AWS_REGION\n"
+            "    (e.g. AWS_REGION=ap-south-1). Fallback defaults are disallowed."
+        )
 
     access_model_path = os.path.join(project_root, "artifacts", "generated_access_model.json")
     if not os.path.exists(access_model_path):

@@ -1,20 +1,26 @@
 # 02_gcp_aws_resource_creator.py
 # Purpose: Provision GCP/AWS buckets, IAM entities, and emit per-user credentials.
-# Note: Business logic preserved. Comments normalized; no emojis; [INFO]/[WARN]/[ERROR] log tags.
+# Supports --auth_mode static (default) and --auth_mode auth0.
+# Note: Drift queue provisioning is isolated and decoupled from standard pipeline execution.
 
 import os
 import sys
 import json
 import time
 import base64
+import argparse
 from pathlib import Path
 
-# Add project root to sys.path so scripts.ops can always be imported
+# Add project root to sys.path so src and scripts.ops can always be imported
 project_root = str(Path(__file__).resolve().parent.parent)
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from dotenv import load_dotenv
+from src.env_loader import load_project_env
+load_project_env()
+load_dotenv(dotenv_path=os.path.join(project_root, "config", ".env"), override=True)
+
 from googleapiclient.discovery import build
 try:
     from oauth2client.service_account import ServiceAccountCredentials
@@ -26,20 +32,16 @@ import boto3
 # Environment
 # ---------------------------------------------------------------------
 
-# Load .env from repo root or current working directory
-load_dotenv(dotenv_path=Path.cwd() / ".env", override=True)
-
 GCP_PROJECT_ID = os.environ.get("GCP_PROJECT_ID", "project-444c1d0a-6028-4d76-8d5")
-GCP_ADMIN_KEY_PATH = os.environ.get("GCP_ADMIN_KEY_PATH", "./artifacts/gcp-admin-key.json")
-GCP_BUCKET_LOCATION = os.environ.get("GCP_BUCKET_LOCATION", "asia-south1")
+GCP_ADMIN_KEY_PATH = os.environ.get("GCP_ADMIN_KEY_PATH", os.path.join(project_root, "artifacts", "gcp-admin-key.json"))
+GCP_BUCKET_LOCATION = os.environ.get("GCP_BUCKET_LOCATION")
 GCP_BUCKET_STORAGE_CLASS = os.environ.get("GCP_BUCKET_STORAGE_CLASS", "STANDARD")
 
-AWS_REGION = os.environ.get("AWS_REGION", "ap-south-1")
+AWS_REGION = os.environ.get("AWS_REGION")
 AWS_ADMIN_ACCESS_KEY = os.environ.get("AWS_ADMIN_ACCESS_KEY", "")
 AWS_ADMIN_SECRET_KEY = os.environ.get("AWS_ADMIN_SECRET_KEY", "")
 
-ARTIFACTS_DIR = Path("artifacts")
-
+ARTIFACTS_DIR = Path(project_root) / "artifacts"
 ACCESS_MODEL_PATH = ARTIFACTS_DIR / "generated_access_model.json"
 CREDENTIAL_OUTPUT_PATH = ARTIFACTS_DIR / "test_credential.txt"
 
@@ -52,17 +54,60 @@ def _ensure_parent_dir(path_str: str) -> None:
     p = Path(path_str).expanduser().resolve()
     p.parent.mkdir(parents=True, exist_ok=True)
 
+def validate_region_prerequisites() -> None:
+    """
+    Ensure mandatory region environment variables are explicitly defined in config/.env.
+    Disallows fallback defaults. Raises ValueError and exits if missing.
+    """
+    missing = []
+    if not os.environ.get("AWS_REGION"):
+        missing.append("AWS_REGION (e.g. AWS_REGION=ap-south-1)")
+    if not os.environ.get("GCP_BUCKET_LOCATION"):
+        missing.append("GCP_BUCKET_LOCATION (e.g. GCP_BUCKET_LOCATION=asia-south1)")
+
+    if missing:
+        err_lines = [
+            "",
+            "=" * 80,
+            "  [FATAL PRE-FLIGHT ERROR] MANDATORY REGION CONFIGURATION MISSING",
+            "=" * 80,
+            "Bucket and queue provisioning strictly requires explicit region configuration.",
+            "Fallback default values are disallowed. The following keys are missing in config/.env:",
+        ]
+        for m in missing:
+            err_lines.append(f"    - {m}")
+        err_lines.extend([
+            "",
+            "HOW TO FIX:",
+            f"  1. Open: {os.path.join(project_root, 'config', '.env')}",
+            "  2. Add the required region keys (e.g., AWS_REGION=ap-south-1 and GCP_BUCKET_LOCATION=asia-south1).",
+            "=" * 80,
+            "",
+        ])
+        err_msg = "\n".join(err_lines)
+        print(err_msg, file=sys.stderr)
+        raise ValueError(f"Mandatory region configuration missing: {', '.join(missing)}")
+
 # ---------------------------------------------------------------------
 # Load access model
 # ---------------------------------------------------------------------
 
-with open(ACCESS_MODEL_PATH, "r", encoding="utf-8") as f:
-    access_model = json.load(f)
-
-GCP_RBAC = access_model["GCP_RBAC"]
-AWS_ABAC = access_model["AWS_ABAC"]
-USERS = access_model["USERS"]
-USER_GROUPS = access_model.get("USER_GROUPS", {})
+if os.path.exists(ACCESS_MODEL_PATH):
+    with open(ACCESS_MODEL_PATH, "r", encoding="utf-8") as f:
+        access_model = json.load(f)
+    GCP_RBAC = access_model.get("GCP_RBAC", {})
+    AWS_ABAC = access_model.get("AWS_ABAC", {})
+    USERS = access_model.get("USERS", [])
+    USER_GROUPS = access_model.get("USER_GROUPS", {})
+else:
+    print(f"[WARN] Access model not found at {ACCESS_MODEL_PATH}. Using standard blueprint user roster.")
+    GCP_RBAC = {}
+    AWS_ABAC = {}
+    USERS = [
+        {"name": f"user-{i}", "gcp_roles": None, "aws_attributes": None}
+        for i in range(1, 8)
+    ] + [{"name": "baseline-admin", "full_access": True}]
+    USER_GROUPS = {}
 
 # ---------------------------------------------------------------------
 # SDK clients
@@ -73,23 +118,27 @@ if GCP_ADMIN_KEY_PATH and os.path.exists(GCP_ADMIN_KEY_PATH):
     gcp_credentials = ServiceAccountCredentials.from_json_keyfile_name(GCP_ADMIN_KEY_PATH, SCOPES)
 else:
     import google.auth
-    gcp_credentials, _ = google.auth.default(scopes=SCOPES)
+    try:
+        gcp_credentials, _ = google.auth.default(scopes=SCOPES)
+    except Exception:
+        gcp_credentials = None
 
-gcp_storage = build("storage", "v1", credentials=gcp_credentials)
-gcp_iam = build("iam", "v1", credentials=gcp_credentials)
+gcp_storage = build("storage", "v1", credentials=gcp_credentials) if gcp_credentials else None
+gcp_iam = build("iam", "v1", credentials=gcp_credentials) if gcp_credentials else None
 
 aws_s3 = boto3.client(
     "s3",
     aws_access_key_id=AWS_ADMIN_ACCESS_KEY,
     aws_secret_access_key=AWS_ADMIN_SECRET_KEY,
     region_name=AWS_REGION,
-)
+) if AWS_ADMIN_ACCESS_KEY else None
+
 aws_iam = boto3.client(
     "iam",
     aws_access_key_id=AWS_ADMIN_ACCESS_KEY,
     aws_secret_access_key=AWS_ADMIN_SECRET_KEY,
     region_name=AWS_REGION,
-)
+) if AWS_ADMIN_ACCESS_KEY else None
 
 # ---------------------------------------------------------------------
 # GCP
@@ -97,6 +146,10 @@ aws_iam = boto3.client(
 
 def create_gcp_buckets() -> None:
     """Create GCP buckets if they do not exist."""
+    validate_region_prerequisites()
+    if not gcp_storage:
+        print("[GCP][WARN] GCP Storage client not available. Skipping bucket creation.")
+        return
     for bucket_name in set(GCP_RBAC.values()):
         try:
             gcp_storage.buckets().insert(
@@ -118,6 +171,9 @@ def create_gcp_buckets() -> None:
 def setup_gcp_users() -> dict:
     """Create service accounts, bind storage.objectViewer to target buckets, and issue keys."""
     result = {}
+    if not gcp_iam or not gcp_storage:
+        print("[GCP][WARN] GCP IAM or Storage client not available. Skipping user setup.")
+        return result
 
     for user in USERS:
         name = user["name"]
@@ -217,6 +273,10 @@ def setup_gcp_users() -> dict:
 
 def create_aws_buckets() -> None:
     """Create S3 buckets if they do not exist."""
+    validate_region_prerequisites()
+    if not aws_s3:
+        print("[AWS][WARN] AWS S3 client not available. Skipping bucket creation.")
+        return
     for bucket_name in AWS_ABAC.keys():
         try:
             if AWS_REGION == "us-east-1":
@@ -238,6 +298,10 @@ def setup_aws_users_and_abac_groups() -> dict:
     and add users to groups per USER_GROUPS.
     """
     result = {}
+    if not aws_iam:
+        print("[AWS][WARN] AWS IAM client not available. Skipping group setup.")
+        return result
+
     created_groups = set()
 
     # Create groups
@@ -284,7 +348,12 @@ def setup_aws_users_and_abac_groups() -> dict:
             policy_arn = response["Policy"]["Arn"]
             print(f"[AWS][INFO] Created policy: {policy_name}")
         except aws_iam.exceptions.EntityAlreadyExistsException:
-            account_id = boto3.client("sts").get_caller_identity()["Account"]
+            account_id = boto3.client(
+                "sts",
+                aws_access_key_id=AWS_ADMIN_ACCESS_KEY,
+                aws_secret_access_key=AWS_ADMIN_SECRET_KEY,
+                region_name=AWS_REGION,
+            ).get_caller_identity()["Account"]
             policy_arn = f"arn:aws:iam::{account_id}:policy/{policy_name}"
             print(f"[AWS][INFO] Policy already exists: {policy_name}")
 
@@ -300,6 +369,9 @@ def setup_aws_users_and_abac_groups() -> dict:
 def create_aws_users() -> dict:
     """Create IAM users, tag them for ABAC, optionally attach full S3 access, and issue access keys."""
     result = {}
+    if not aws_iam:
+        print("[AWS][WARN] AWS IAM client not available. Skipping user creation.")
+        return result
 
     for user in USERS:
         name = user["name"]
@@ -376,8 +448,58 @@ def setup_aws() -> None:
         json.dump(merged, f, indent=2)
     print(f"[AWS][INFO] AWS credentials appended to {CREDENTIAL_OUTPUT_PATH}")
 
+def setup_auth0() -> None:
+    """
+    Provision multi-cloud storage buckets, sync users to Auth0 Cloud Directory,
+    and configure AWS OIDC dynamic role federation.
+    Emits federated identity roster to test_credential.txt without permanent IAM keys.
+    """
+    print("\n" + "=" * 80)
+    print(">>> Provisioning Multi-Cloud Infrastructure in AUTH0 Federated Mode...")
+    print("=" * 80)
+
+    # 1. Create S3 & GCS Buckets (shared data plane across all modes)
+    create_gcp_buckets()
+    create_aws_buckets()
+
+    # 2. Sync all blueprint users to Auth0 Directory
+    print("\n[AUTH0][INFO] Syncing blueprint users to Auth0 Cloud Directory...")
+    try:
+        from scripts.ops.identity.auth0_create_user import create_all_blueprint_users
+        create_all_blueprint_users()
+    except Exception as e:
+        print(f"[AUTH0][ERROR] Failed to sync users to Auth0: {e}")
+
+    # 3. Setup AWS OIDC dynamic federation role and policy
+    print("\n[AUTH0][INFO] Setting up AWS OIDC Identity Provider & Role...")
+    try:
+        from scripts.ops.identity.setup_aws_idp import setup_aws_idp
+        setup_aws_idp()
+    except Exception as e:
+        print(f"[AUTH0][ERROR] Failed to set up AWS IDP: {e}")
+
+    # 4. Emit federated user roster to test_credential.txt
+    _ensure_parent_dir(CREDENTIAL_OUTPUT_PATH)
+    federated_users = [
+        {
+            "name": u["name"],
+            "auth_mode": "auth0",
+            "status": "federated",
+            "aws_access_key": "",
+            "aws_secret_key": "",
+            "gcp_credential": {},
+        }
+        for u in USERS
+    ]
+    with open(CREDENTIAL_OUTPUT_PATH, "w", encoding="utf-8") as f:
+        json.dump(federated_users, f, indent=2)
+    print(f"\n[AUTH0][INFO] Auth0 federated user roster saved to {CREDENTIAL_OUTPUT_PATH}")
+
 def setup_drift_queues() -> None:
-    """Set up AWS SQS and GCP Pub/Sub drift notification queues."""
+    """
+    Set up AWS SQS and GCP Pub/Sub drift notification queues.
+    (Note: Decoupled from default 02 pipeline flow. Kept for manual operational import).
+    """
     print("\n" + "=" * 80)
     print(">>> Provisioning Multi-Cloud Drift Notification Queues (SQS & Pub/Sub)...")
     print("=" * 80)
@@ -403,7 +525,32 @@ def setup_drift_queues() -> None:
 # Main
 # ---------------------------------------------------------------------
 
+def main():
+    validate_region_prerequisites()
+    parser = argparse.ArgumentParser(description="02: Multi-Cloud Resource & Identity Provisioner")
+    parser.add_argument(
+        "--auth_mode",
+        choices=["static", "auth0"],
+        default=os.environ.get("AUTH_MODE", "static").strip().lower(),
+        help="Identity federation bridge mode: 'static' (IAM users + access keys) or 'auth0' (Cloud IDP federation). Default: static",
+    )
+    args = parser.parse_args()
+    mode = args.auth_mode.lower()
+    os.environ["AUTH_MODE"] = mode
+
+    print("=" * 80)
+    print(f">>> Executing 02_gcp_aws_resource_creator.py in Mode: [{mode.upper()}]")
+    print("=" * 80)
+
+    if mode == "auth0":
+        setup_auth0()
+    else:
+        setup_gcp()
+        setup_aws()
+
+    print("\n" + "=" * 80)
+    print(f">>> Multi-Cloud Resource Provisioning Complete for Mode: [{mode.upper()}]")
+    print("=" * 80)
+
 if __name__ == "__main__":
-    setup_gcp()
-    setup_aws()
-    setup_drift_queues()
+    main()

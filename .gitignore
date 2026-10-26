@@ -21,6 +21,7 @@ config/.env
 *gcp*.json
 config/*.json
 
+
 # Indices & Vector Databases
 vector_db/
 *.index

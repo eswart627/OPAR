@@ -3,21 +3,26 @@
 # Note: Business logic preserved. Comments normalized; no emojis; [INFO]/[WARN]/[ERROR] tags.
 
 import os
+import sys
 import json
 import random
 import re
 import uuid
 from tqdm import tqdm
 from pathlib import Path
-from dotenv import load_dotenv
 from collections import defaultdict
+
+project_root = str(Path(__file__).resolve().parent.parent)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 # ---------------------------------------------------------------------
 # Environment
 # ---------------------------------------------------------------------
 
-# Load environment variables from .env in current working directory
-load_dotenv(dotenv_path=Path.cwd() / ".env", override=True)
+# Load environment variables from config/.env
+from src.env_loader import load_project_env
+load_project_env()
 
 # ---------------------------------------------------------------------
 # Configuration

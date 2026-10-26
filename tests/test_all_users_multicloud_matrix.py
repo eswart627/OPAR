@@ -35,7 +35,7 @@ GCP_SA_EMAIL = f"gcp-admin@{GCP_PROJECT_ID}.iam.gserviceaccount.com"
 if not all([AUTH0_DOMAIN, AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET, AUTH0_ROLE_ARN, GCP_PROJECT_ID]):
     raise ValueError("Missing required cloud/Auth0 environment variables in config/.env")
 
-DEFAULT_PASSWORD = "Corporate@Pass2026!"
+DEFAULT_PASSWORD = os.environ.get("AUTH0_DEFAULT_PASSWORD", "Corporate@Pass2026!")
 EMAIL_DOMAIN = "@company.internal"
 
 

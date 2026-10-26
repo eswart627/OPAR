@@ -25,9 +25,17 @@ def validate_gcp_prerequisites():
 
     project_id = os.environ.get("GCP_PROJECT_ID")
     key_path = os.environ.get("GCP_ADMIN_KEY_PATH")
+    bucket_location = os.environ.get("GCP_BUCKET_LOCATION")
 
     if not project_id:
         errors.append("  - GCP_PROJECT_ID is missing from config/.env")
+
+    if not bucket_location:
+        errors.append(
+            "  - GCP_BUCKET_LOCATION is missing from config/.env.\n"
+            "    GCP Pub/Sub notifications strictly require an explicit GCP_BUCKET_LOCATION\n"
+            "    (e.g. GCP_BUCKET_LOCATION=asia-south1). Fallback defaults are disallowed."
+        )
 
     if not key_path:
         errors.append("  - GCP_ADMIN_KEY_PATH is missing from config/.env")
