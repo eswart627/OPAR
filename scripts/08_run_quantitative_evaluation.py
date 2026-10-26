@@ -16,7 +16,9 @@ from src.processors.question_processor import QuestionProcessor
 
 from scripts.helpers.hotpot_evaluate_with_em_admin import eval as hp_eval
 
-load_dotenv()
+from src.env_loader import load_project_env
+load_project_env()
+load_dotenv(override=True)
 
 # Setup root results directory and logger
 ROOT_RESULTS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "results"))
@@ -49,7 +51,15 @@ def main():
         help="Top-k retrieved documents",
 
     )
+    parser.add_argument(
+        "--auth_mode",
+        choices=["static", "auth0"],
+        default=None,
+        help="Identity federation bridge mode: 'static' or 'auth0'. Defaults to AUTH_MODE in config/.env.",
+    )
     args = parser.parse_args()
+    if args.auth_mode:
+        os.environ["AUTH_MODE"] = args.auth_mode.lower()
     retriever_mode = args.mode.lower()
 
     logger.info("=" * 80)

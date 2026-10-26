@@ -12,10 +12,15 @@ class AWSAccessControl(AccessControlBase):
     def _client(self):
         ak = self.user_credential.get("aws_access_key")
         sk = self.user_credential.get("aws_secret_key")
+        st = self.user_credential.get("aws_session_token")
         if not (ak and sk):
             return None
         try:
-            return boto3.Session(aws_access_key_id=ak, aws_secret_access_key=sk).client("s3")
+            return boto3.Session(
+                aws_access_key_id=ak,
+                aws_secret_access_key=sk,
+                aws_session_token=st,
+            ).client("s3")
         except Exception as e:
             print(f"[AWS][ERROR] Failed to create S3 client: {e}")
             return None

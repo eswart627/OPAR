@@ -1,4 +1,10 @@
 import os
+import sys
+from pathlib import Path
+
+project_root = str(Path(__file__).resolve().parent.parent)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 import json, time
 from src.stores.vector_store import VectorStore
 from src.stores.metadata_store import MetadataStore
@@ -8,7 +14,9 @@ from src.processors.question_processor import QuestionProcessor
 
 
 from dotenv import load_dotenv
-load_dotenv()
+from src.env_loader import load_project_env
+load_project_env()
+load_dotenv(override=True)
 
 def main():
     ARTIFACTS = "./artifacts"

@@ -65,13 +65,20 @@ def get_user_id_token(email: str) -> str:
 def get_aws_sts_credentials(id_token: str, session_name: str) -> dict:
     """Exchanges Auth0 ID Token with AWS STS for 1-hour credentials."""
     sts_client = boto3.client("sts", region_name=AWS_REGION)
-    resp = sts_client.assume_role_with_web_identity(
-        RoleArn=AUTH0_ROLE_ARN,
-        RoleSessionName=session_name,
-        WebIdentityToken=id_token,
-        DurationSeconds=3600,
-    )
-    return resp["Credentials"]
+    for attempt in range(3):
+        try:
+            resp = sts_client.assume_role_with_web_identity(
+                RoleArn=AUTH0_ROLE_ARN,
+                RoleSessionName=session_name,
+                WebIdentityToken=id_token,
+                DurationSeconds=3600,
+            )
+            return resp["Credentials"]
+        except Exception as e:
+            if attempt < 2 and "InvalidIdentityToken" in str(e):
+                time.sleep(1.0)
+                continue
+            raise
 
 
 def get_gcp_access_token(id_token: str) -> str:

@@ -383,18 +383,18 @@ def setup_drift_queues() -> None:
     print("=" * 80)
     try:
         try:
-            from scripts.ops.setup_aws_drift_queue import setup_sqs_and_notifications
+            from scripts.ops.drift.setup_aws_drift_queue import setup_sqs_and_notifications
         except ModuleNotFoundError:
-            from ops.setup_aws_drift_queue import setup_sqs_and_notifications
+            from ops.drift.setup_aws_drift_queue import setup_sqs_and_notifications
         setup_sqs_and_notifications()
     except Exception as e:
         print(f"[AWS][ERROR] Failed to set up SQS drift queue: {e}")
 
     try:
         try:
-            from scripts.ops.setup_gcp_drift_queue import setup_gcp_pubsub
+            from scripts.ops.drift.setup_gcp_drift_queue import setup_gcp_pubsub
         except ModuleNotFoundError:
-            from ops.setup_gcp_drift_queue import setup_gcp_pubsub
+            from ops.drift.setup_gcp_drift_queue import setup_gcp_pubsub
         setup_gcp_pubsub()
     except Exception as e:
         print(f"[GCP][ERROR] Failed to set up GCP Pub/Sub drift queue: {e}")

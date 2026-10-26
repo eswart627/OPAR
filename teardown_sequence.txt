@@ -1,0 +1,29 @@
+# ==============================================================================
+# PERMISSION-AWARE RAG: COMPLETE TEARDOWN & RESET SEQUENCE
+# ==============================================================================
+# Run these commands sequentially from the project root:
+# Working Directory: c:\Users\pichi\Desktop\Permission Aware RAG\permission-aware-rag
+
+# 1. Deprovision AWS Cloud Resources (5 S3 buckets, 8 IAM users, groups, ABAC policies)
+.\venv\Scripts\python.exe scripts/ops/cloud/deprovision_aws.py
+
+# 2. Deprovision GCP Cloud Resources (5 GCS buckets, 8 Service Accounts)
+.\venv\Scripts\python.exe scripts/ops/cloud/deprovision_gcp.py
+
+# 3. Delete Auth0 Users (@company.internal users in Auth0 Tenant)
+.\venv\Scripts\python.exe scripts/ops/identity/auth0_delete_user.py
+
+# 4. Deprovision AWS SQS Drift Queue & detach S3 bucket notifications
+.\venv\Scripts\python.exe scripts/ops/drift/deprovision_aws_drift_queue.py
+
+# 5. Deprovision GCP Pub/Sub Drift Topic & Subscription
+.\venv\Scripts\python.exe scripts/ops/drift/deprovision_gcp_drift_queue.py
+
+# 6. Deprovision AWS IdP (IAM Role Corporate-RAG-Auth0-Role & Auth0 OIDC Provider)
+.\venv\Scripts\python.exe scripts/ops/identity/deprovision_aws_idp.py
+
+# 7. Clean Local Generated Pipeline Data (metadata.db, vector_db, results, access model)
+.\venv\Scripts\python.exe scripts/ops/utils/clean_generated_data.py
+
+# 8. Final Audit: Verify All Multi-Cloud & IdP Resources are 100% Cleared
+.\venv\Scripts\python.exe scripts/ops/utils/audit_cloud_resources.py
