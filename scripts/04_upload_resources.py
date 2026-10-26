@@ -52,21 +52,26 @@ from tqdm import tqdm
 # Upload helpers
 # ---------------------------------------------------------------------
 
-def upload_to_gcp(bucket_name: str, file_path: str, blob_name: str) -> bool:
-    """Upload a single file to a GCS bucket."""
+def upload_to_gcp(bucket_name: str, file_path: str, blob_name: str, global_uuid: str = "") -> bool:
+    """Upload a single file to a GCS bucket with resource_id metadata."""
     try:
         bucket = gcp_client.bucket(bucket_name)
         blob = bucket.blob(blob_name)
+        if global_uuid:
+            blob.metadata = {"resource_id": global_uuid}
         blob.upload_from_filename(file_path)
         return True
     except Exception as e:
         print(f"[GCP][ERROR] Failed {blob_name} -> {bucket_name}: {e}")
         return False
 
-def upload_to_aws(bucket_name: str, file_path: str, key: str) -> bool:
-    """Upload a single file to an S3 bucket."""
+def upload_to_aws(bucket_name: str, file_path: str, key: str, global_uuid: str = "") -> bool:
+    """Upload a single file to an S3 bucket with resource_id metadata."""
     try:
-        s3_client.upload_file(file_path, bucket_name, key)
+        extra_args = {}
+        if global_uuid:
+            extra_args["Metadata"] = {"resource_id": global_uuid}
+        s3_client.upload_file(file_path, bucket_name, key, ExtraArgs=extra_args if extra_args else None)
         return True
     except Exception as e:
         print(f"[AWS][ERROR] Failed {key} -> {bucket_name}: {e}")
@@ -80,15 +85,16 @@ def _upload_task(item):
     file_name, info = item
     provider = info["provider"]
     bucket = info["bucket"]
+    global_uuid = info.get("global_uuid", "")
     file_path = os.path.join(RESOURCE_DIR, provider.upper(), bucket, file_name)
 
     if not os.path.exists(file_path):
         return False
 
     if provider == "gcp":
-        return upload_to_gcp(bucket, file_path, file_name)
+        return upload_to_gcp(bucket, file_path, file_name, global_uuid=global_uuid)
     elif provider == "aws":
-        return upload_to_aws(bucket, file_path, file_name)
+        return upload_to_aws(bucket, file_path, file_name, global_uuid=global_uuid)
     return False
 
 def upload_all(max_workers: int = 30) -> None:

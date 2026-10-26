@@ -140,11 +140,9 @@ class IngestionManager:
             provider = storage_info.get("provider", "")
             bucket = storage_info.get("bucket", "")
             
-            if self.cfg.deterministic_uuid:
-                key = f"{provider}:{bucket}:{file_name}"
-                global_uuid = str(uuid.uuid5(uuid.NAMESPACE_URL, key))
-            else:
-                global_uuid = str(uuid.uuid4())
+            global_uuid = storage_info.get("global_uuid")
+            if not global_uuid:
+                global_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, file_name))
 
             endpoint = self.cfg.gcp_endpoint if provider == "gcp" else self.cfg.aws_endpoint
 

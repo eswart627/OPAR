@@ -6,6 +6,7 @@ import os
 import json
 import random
 import re
+import uuid
 from tqdm import tqdm
 from pathlib import Path
 from dotenv import load_dotenv
@@ -112,7 +113,10 @@ def generate_documents_and_storage_info() -> None:
 
             count_by_bucket[bucket] += 1
 
+            doc_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, filename))
+
             storage_map[filename] = {
+                "global_uuid": doc_uuid,
                 "provider": provider,
                 "bucket": bucket,
                 "region": GCP_REGION if provider == "gcp" else AWS_REGION,

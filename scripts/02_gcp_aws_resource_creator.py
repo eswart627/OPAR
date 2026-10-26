@@ -3,10 +3,16 @@
 # Note: Business logic preserved. Comments normalized; no emojis; [INFO]/[WARN]/[ERROR] log tags.
 
 import os
+import sys
 import json
 import time
 import base64
 from pathlib import Path
+
+# Add project root to sys.path so scripts.ops can always be imported
+project_root = str(Path(__file__).resolve().parent.parent)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 from dotenv import load_dotenv
 from googleapiclient.discovery import build
@@ -370,6 +376,29 @@ def setup_aws() -> None:
         json.dump(merged, f, indent=2)
     print(f"[AWS][INFO] AWS credentials appended to {CREDENTIAL_OUTPUT_PATH}")
 
+def setup_drift_queues() -> None:
+    """Set up AWS SQS and GCP Pub/Sub drift notification queues."""
+    print("\n" + "=" * 80)
+    print(">>> Provisioning Multi-Cloud Drift Notification Queues (SQS & Pub/Sub)...")
+    print("=" * 80)
+    try:
+        try:
+            from scripts.ops.setup_aws_drift_queue import setup_sqs_and_notifications
+        except ModuleNotFoundError:
+            from ops.setup_aws_drift_queue import setup_sqs_and_notifications
+        setup_sqs_and_notifications()
+    except Exception as e:
+        print(f"[AWS][ERROR] Failed to set up SQS drift queue: {e}")
+
+    try:
+        try:
+            from scripts.ops.setup_gcp_drift_queue import setup_gcp_pubsub
+        except ModuleNotFoundError:
+            from ops.setup_gcp_drift_queue import setup_gcp_pubsub
+        setup_gcp_pubsub()
+    except Exception as e:
+        print(f"[GCP][ERROR] Failed to set up GCP Pub/Sub drift queue: {e}")
+
 # ---------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------
@@ -377,3 +406,4 @@ def setup_aws() -> None:
 if __name__ == "__main__":
     setup_gcp()
     setup_aws()
+    setup_drift_queues()

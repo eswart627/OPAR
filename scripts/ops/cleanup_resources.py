@@ -7,12 +7,19 @@ import sys
 from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv(dotenv_path=Path.cwd() / ".env", override=True)
+project_root = str(Path(__file__).resolve().parent.parent.parent)
+env_path = os.path.join(project_root, "config", ".env")
+load_dotenv(dotenv_path=env_path, override=True)
+if not os.path.exists(env_path):
+    load_dotenv(dotenv_path=Path.cwd() / ".env", override=True)
+
+sys.stdout.reconfigure(line_buffering=True)
 
 ARTIFACTS_DIR = Path("artifacts")
 ACCESS_MODEL_PATH = ARTIFACTS_DIR / "generated_access_model.json"
 
 GCP_PROJECT_ID = os.environ.get("GCP_PROJECT_ID", "project-444c1d0a-6028-4d76-8d5")
+GCP_ADMIN_KEY_PATH = os.environ.get("GCP_ADMIN_KEY_PATH", "")
 AWS_REGION = os.environ.get("AWS_REGION", "ap-south-1")
 AWS_ADMIN_ACCESS_KEY = os.environ.get("AWS_ADMIN_ACCESS_KEY", "")
 AWS_ADMIN_SECRET_KEY = os.environ.get("AWS_ADMIN_SECRET_KEY", "")
@@ -41,9 +48,21 @@ def cleanup_gcp(model=None):
         return
 
     try:
-        storage_client = storage.Client(project=GCP_PROJECT_ID)
-        creds, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
-        iam_client = build("iam", "v1", credentials=creds)
+        resolved_key = GCP_ADMIN_KEY_PATH
+        if resolved_key and not os.path.isabs(resolved_key):
+            resolved_key = os.path.abspath(os.path.join(project_root, resolved_key))
+
+        if resolved_key and os.path.exists(resolved_key):
+            storage_client = storage.Client.from_service_account_json(resolved_key)
+            from google.oauth2 import service_account
+            creds = service_account.Credentials.from_service_account_file(
+                resolved_key, scopes=["https://www.googleapis.com/auth/cloud-platform"]
+            )
+            iam_client = build("iam", "v1", credentials=creds)
+        else:
+            storage_client = storage.Client(project=GCP_PROJECT_ID)
+            creds, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+            iam_client = build("iam", "v1", credentials=creds)
     except Exception as e:
         print(f"[GCP][ERROR] Failed to authenticate GCP client: {e}")
         return
@@ -88,6 +107,12 @@ def cleanup_gcp(model=None):
             else:
                 print(f"[GCP][WARN] Could not delete service account {sa_email}: {e}")
 
+    try:
+        from scripts.ops.deprovision_gcp_drift_queue import deprovision_gcp_drift_queue
+        deprovision_gcp_drift_queue()
+    except Exception as e:
+        print(f"[GCP][WARN] Could not deprovision drift queue: {e}")
+
     print("[GCP][SUCCESS] GCP cleanup completed successfully!")
 
 # ---------------------------------------------------------------------
@@ -128,7 +153,26 @@ def cleanup_aws(model=None):
         return
 
     # 1. Delete AWS S3 Buckets
-    aws_buckets = list((model.get("AWS_ABAC", {}) if model else {}).keys())
+    if model and "AWS_ABAC" in model:
+        aws_buckets = list(model["AWS_ABAC"].keys())
+    else:
+        # Region-based fallback: find all buckets matching '-aws-bucket-' in AWS_REGION
+        aws_buckets = []
+        try:
+            for b in s3.list_buckets().get("Buckets", []):
+                name = b["Name"]
+                if "-aws-bucket-" in name:
+                    try:
+                        loc = s3.get_bucket_location(Bucket=name).get("LocationConstraint")
+                        if loc == AWS_REGION or (loc is None and AWS_REGION in ("us-east-1", "")):
+                            aws_buckets.append(name)
+                        elif not loc:
+                            aws_buckets.append(name)
+                    except Exception:
+                        aws_buckets.append(name)
+        except Exception as e:
+            print(f"[AWS][WARN] Could not list S3 buckets: {e}")
+
     for bucket_name in aws_buckets:
         try:
             # Delete all objects in bucket
@@ -146,7 +190,10 @@ def cleanup_aws(model=None):
                 print(f"[AWS][WARN] Could not delete bucket {bucket_name}: {e}")
 
     # 2. Clean up Users (Access keys, attached policies, group memberships)
-    users = model.get("USERS", []) if model else []
+    users = model.get("USERS", []) if model else [
+        {"name": f"user-{i}"} for i in range(1, 8)
+    ] + [{"name": "baseline-admin"}]
+
     for u in users:
         uname = u["name"]
         # Delete access keys
@@ -184,8 +231,15 @@ def cleanup_aws(model=None):
                 print(f"[AWS][WARN] Could not delete user {uname}: {e}")
 
     # 3. Clean up Groups and Policies
-    user_groups = model.get("USER_GROUPS", {}) if model else {}
-    for gname in user_groups.keys():
+    if model and "USER_GROUPS" in model:
+        user_groups_list = list(model["USER_GROUPS"].keys())
+    else:
+        try:
+            user_groups_list = [g["GroupName"] for g in iam.list_groups().get("Groups", []) if g["GroupName"].startswith("g-") or "abac" in g["GroupName"]]
+        except Exception:
+            user_groups_list = []
+
+    for gname in user_groups_list:
         # Detach attached policies from group
         try:
             gpols = iam.list_attached_group_policies(GroupName=gname).get("AttachedPolicies", [])
@@ -208,6 +262,12 @@ def cleanup_aws(model=None):
             if "NoSuchEntity" not in str(e):
                 print(f"[AWS][WARN] Could not delete policy {policy_name}: {e}")
 
+    try:
+        from scripts.ops.deprovision_aws_drift_queue import deprovision_aws_drift_queue
+        deprovision_aws_drift_queue()
+    except Exception as e:
+        print(f"[AWS][WARN] Could not deprovision drift queue: {e}")
+
     print("[AWS][SUCCESS] AWS cleanup completed successfully!")
 
 if __name__ == "__main__":
@@ -218,3 +278,11 @@ if __name__ == "__main__":
         cleanup_gcp(model)
     if target in ("all", "aws"):
         cleanup_aws(model)
+
+    # Delete access model JSON at the very end after deprovisioning
+    if target == "all" and os.path.exists(ACCESS_MODEL_PATH):
+        try:
+            os.remove(ACCESS_MODEL_PATH)
+            print(f"[CLEANUP][INFO] Deleted {ACCESS_MODEL_PATH}")
+        except Exception as e:
+            print(f"[CLEANUP][WARN] Could not delete {ACCESS_MODEL_PATH}: {e}")
