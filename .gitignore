@@ -35,6 +35,7 @@ vector_db/
 results/
 logs/
 *.log
+*.pid
 
 # Data & Artifacts (HotpotQA, generated JSONs, text)
 artifacts/
