@@ -1,0 +1,88 @@
+/* stepper.css
+ * Compact Visibility Stepper (Zero Screen Waste)
+ */
+
+.stepper-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 8px 18px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-card);
+}
+
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.step-indicator {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-accent);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 11px;
+  transition: all 0.2s ease;
+}
+
+.step-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.step-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.step-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.step-item.active .step-indicator {
+  border-color: #0284c7;
+  color: #0284c7;
+  background: #e0f2fe;
+}
+
+.step-item.active .step-title {
+  color: #0284c7;
+}
+
+.step-item.completed .step-indicator {
+  border-color: #059669;
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+.step-item.completed .step-title {
+  color: var(--text-primary);
+}
+
+.step-item.completed .step-meta {
+  color: #047857;
+  font-weight: 600;
+}
+
+.step-divider {
+  width: 28px;
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 0 12px;
+  flex-shrink: 0;
+}

@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.venv/
+venv/
+env/
+
+# Environment files
+.env
+.env.*
+config/.env
+
+# Secrets & Credentials
+*credential*
+*.key
+*.pem
+*service_account*.json
+*gcp*.json
+config/*.json
+
+
+# Indices & Vector Databases
+vector_db/
+*.index
+*.pkl
+
+# VSCode / OS
+.vscode/
+.DS_Store
+*.swp
+
+# Generated Test Outputs & Results
+results/
+logs/
+*.log
+*.pid
+
+# Data & Artifacts (HotpotQA, generated JSONs, text)
+artifacts/
+*.json

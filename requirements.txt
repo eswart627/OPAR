@@ -1,0 +1,27 @@
+# Core Environment & Configuration
+python-dotenv
+requests
+tqdm
+ujson
+
+# AWS Cloud & IAM / STS
+boto3
+
+# Google Cloud Platform (Storage, IAM, Pub/Sub, STS)
+google-api-python-client
+google-auth
+google-cloud-storage
+google-cloud-iam
+google-cloud-pubsub
+oauth2client
+
+# AI / LLM & Retrieval Infrastructure
+google-genai
+langchain
+sentence-transformers
+faiss-cpu
+rank-bm25
+numpy
+
+# Web Application Backend
+flask
