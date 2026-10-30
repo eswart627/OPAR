@@ -1,0 +1,218 @@
+/* config_operations.css
+ * Modular styles for Pipeline Config & Operations tab
+ * Professional 2-Column Responsive Dashboard Layout
+ */
+
+/* 2-Column Dashboard Grid: Balanced 50/50 Split */
+.config-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  .config-grid {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+}
+
+/* Left Column: Settings, Toggles & Cloud Queues */
+.config-left-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+/* Right Column: Full-Height Live Streaming Terminal */
+.config-right-col {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Toggle Switch (iOS Sleek Design) */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #cbd5e1;
+  transition: .2s ease;
+  border-radius: 24px;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .2s ease;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background-color: #0284c7;
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+  transform: translateX(20px);
+}
+
+.toggle-switch input:focus + .toggle-slider {
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.25);
+}
+
+/* Stat Chips (Telemetry Metrics) */
+.stat-chip {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.stat-chip:hover {
+  border-color: var(--border-accent);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+}
+
+.stat-chip-label {
+  font-size: 9.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.4px;
+}
+
+.stat-chip-val {
+  font-size: 14px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+/* Secondary & Outline Buttons */
+.btn-outline {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-accent);
+  padding: 6px 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.btn-outline:hover:not(:disabled) {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border-color: #94a3b8;
+}
+
+.btn-outline:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Terminal Console Box - Expands dynamically to fill remaining height */
+.terminal-console-box {
+  background: #090d16;
+  color: #38bdf8;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.6;
+  padding: 14px;
+  border-radius: var(--radius-sm);
+  flex: 1;
+  height: 100%;
+  min-height: 280px;
+  overflow-y: auto;
+  border: 1px solid #1e293b;
+  white-space: pre-wrap;
+  word-break: break-word;
+  scrollbar-color: #334155 #090d16;
+}
+
+.terminal-console-box::-webkit-scrollbar {
+  width: 6px;
+}
+
+.terminal-console-box::-webkit-scrollbar-track {
+  background: #090d16;
+}
+
+.terminal-console-box::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 3px;
+}
+
+.terminal-console-box::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* Log Syntax Classes */
+.log-aws {
+  color: #f59e0b;
+}
+
+.log-gcp {
+  color: #38bdf8;
+}
+
+.log-daemon {
+  color: #10b981;
+}
+
+.log-err {
+  color: #ef4444;
+}
+
+.log-dim {
+  color: #64748b;
+}
+
+/* Query Cache Indicator in Query & Audit */
+#query-cache-indicator {
+  font-size: 10.5px;
+  letter-spacing: 0.2px;
+  transition: all 0.2s ease;
+}

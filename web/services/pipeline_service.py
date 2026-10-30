@@ -27,6 +27,7 @@ class PipelineService:
     _instance: Optional["PipelineService"] = None
 
     def __init__(self):
+        self.project_root = BASE_DIR
         self.artifacts_dir = os.path.join(BASE_DIR, "artifacts")
         self.vector_db_dir = os.path.join(BASE_DIR, "vector_db")
         self.results_dir = os.path.join(BASE_DIR, "results")
@@ -39,6 +40,7 @@ class PipelineService:
         self.question_processor = None
         self.active_retrievers: Dict[str, HybridRetriever] = {}
         self.is_ready = False
+        self.cache_enabled: bool = False
         
         self.reload()
 
@@ -74,7 +76,7 @@ class PipelineService:
             if self.metadata_store:
                 self.permission_retriever = PermissionRetriever(
                     self.metadata_store,
-                    PermissionRetrieverConfig(max_workers=1, use_cache=True)
+                    PermissionRetrieverConfig(max_workers=1, use_cache=self.cache_enabled)
                 )
 
             # Build mode retrievers

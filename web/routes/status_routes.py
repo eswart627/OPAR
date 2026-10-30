@@ -77,6 +77,7 @@ def get_cache_stats():
     return jsonify(service.permission_retriever.get_cache_stats())
 
 @status_bp.route("/cache/invalidate", methods=["POST"])
+@status_bp.route("/status/cache/invalidate", methods=["POST"])
 def invalidate_cache():
     """
     Webhook / Admin endpoint to invalidate cache entries:
@@ -87,14 +88,19 @@ def invalidate_cache():
     if not service.permission_retriever:
         return jsonify({"error": "Permission retriever not initialized"}), 503
 
+    from web.services.drift_control_service import DriftControlService
+    drift_service = DriftControlService.get_instance()
+
     payload = request.get_json() or {}
-    if payload.get("all"):
+    if payload.get("all") or not payload:
         purged = service.permission_retriever.clear_cache()
-        return jsonify({"status": "cleared_all", "purged_count": purged})
+        drift_service._append_log("CACHE", f"Flushed all cached permission decisions ({purged} entries purged).")
+        return jsonify({"status": "cleared_all", "purged_count": purged, "invalidated_count": purged})
 
     user = payload.get("user")
     if user:
         purged = service.permission_retriever.invalidate_user(user)
-        return jsonify({"status": "user_invalidated", "user": user, "purged_count": purged})
+        drift_service._append_log("CACHE", f"Evicted cached decisions for persona '{user}' ({purged} entries purged).")
+        return jsonify({"status": "user_invalidated", "user": user, "purged_count": purged, "invalidated_count": purged})
 
     return jsonify({"error": "Specify 'user' or 'all': true"}), 400

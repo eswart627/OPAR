@@ -1,0 +1,143 @@
+# ==============================================================================
+# PERMISSION-AWARE MULTI-CLOUD RAG: PIPELINE & WEB APP EXECUTION RUNBOOK
+# ==============================================================================
+# Working Directory:
+#   cd "c:\Users\pichi\Desktop\Permission Aware RAG\permission-aware-rag"
+#
+# Optional Virtual Environment Activation:
+#   PowerShell: .\venv\Scripts\Activate.ps1
+#   CMD:        .\venv\Scripts\activate.bat
+#   Bash:       source venv/Scripts/activate
+#
+# (All commands below directly use .\venv\Scripts\python.exe so they run reliably)
+# ==============================================================================
+
+
+# ==============================================================================
+# 1. CORE PIPELINE EXECUTION (STAGES 01 THROUGH 09)
+# ==============================================================================
+
+# --- Stage 01: Security Access Model Blueprint ---
+# Generates GCP RBAC roles, AWS ABAC bucket rules, and 8 user clearance tiers.
+# Output: artifacts/generated_access_model.json
+.\venv\Scripts\python.exe scripts/01_generate_access_model.py
+
+
+# --- Stage 02: Multi-Cloud Resource & Identity Provisioner ---
+# Creates 5 AWS S3 buckets, 5 GCP GCS buckets, and configures user identities.
+# Note: Choose either Option A (Static IAM) or Option B (Auth0 Federation).
+
+# Option A: Static IAM Mode (8 IAM users, ABAC policies, GCP Service Accounts, access keys)
+.\venv\Scripts\python.exe scripts/02_gcp_aws_resource_creator.py --auth_mode static
+
+# Option B: Auth0 Federated Mode (Auth0 users + metadata, AWS OIDC Identity Provider role)
+.\venv\Scripts\python.exe scripts/02_gcp_aws_resource_creator.py --auth_mode auth0
+
+
+# --- Stage 03: Document Preparation & Multi-Cloud Partitioning ---
+# Slices HotpotQA multi-hop articles into individual text files with deterministic UUIDs.
+# Output: artifacts/resources/ and artifacts/file_to_storage_info.json
+.\venv\Scripts\python.exe scripts/03_prepare_documents.py
+
+
+# --- Stage 04: Upload Documents to Multi-Cloud Buckets ---
+# Concurrently uploads text files into the 10 S3 and GCS buckets with 'resource_id' UUID metadata tags.
+.\venv\Scripts\python.exe scripts/04_upload_resources.py
+
+
+# --- Stage 05: User Access Visibility Matrix (Ground Truth) ---
+# Cross-references storage map with RBAC/ABAC model to build expected document visibility per persona.
+# Output: artifacts/user_accessible_files.json
+.\venv\Scripts\python.exe scripts/05_generate_user_accessible_file_list.py
+
+
+# --- Stage 06: QA Benchmark Extraction ---
+# Extracts multi-hop test questions, gold answers, and supporting facts from HotpotQA.
+# Output: artifacts/question_list.json
+.\venv\Scripts\python.exe scripts/06_generate_question_list.py
+
+
+# --- Stage 07: Dual-Index Ingestion Manager ---
+# Computes dense embeddings with all-MiniLM-L6-v2, builds FAISS & BM25 indices, and SQLite metadata.db.
+# Output: vector_db/faiss.index, vector_db/bm25.pkl, artifacts/metadata.db
+.\venv\Scripts\python.exe scripts/07_run_ingestion_manager.py
+
+
+# --- Stage 08: Quantitative Academic Evaluation Benchmark ---
+# Evaluates security leakages (TP/FP/FN/TN) and answer accuracy (EM, F1, EM@Admin) via Gemini LLM.
+
+# Run Mode 1: Dense Vector Retrieval (FAISS)
+.\venv\Scripts\python.exe scripts/08_run_quantitative_evaluation.py --mode faiss --top_k 5
+
+# Run Mode 2: Hybrid Retrieval (FAISS + BM25 Reciprocal Rank Fusion)
+.\venv\Scripts\python.exe scripts/08_run_quantitative_evaluation.py --mode hybrid --top_k 5
+
+# Run Mode 3: Hybrid with In-Memory TTL Permission Caching (300s TTL speedup)
+.\venv\Scripts\python.exe scripts/08_run_quantitative_evaluation.py --mode hybrid --top_k 5 --cache
+
+
+# --- Stage 09: Latency & Concurrency Evaluation Benchmark ---
+# Profiles retrieval and IAM permission check latencies across worker concurrencies (1-20) and top-k (1-20).
+
+# Live Cloud Check Latency:
+.\venv\Scripts\python.exe scripts/09_run_latency_evaluation.py --sample_size 10
+
+# In-Memory Cached Latency (sub-millisecond lookups):
+.\venv\Scripts\python.exe scripts/09_run_latency_evaluation.py --cache --sample_size 10
+
+
+
+# ==============================================================================
+# 2. RUNNING THE WEB APPLICATION (HCI DASHBOARD)
+# ==============================================================================
+
+# Launch Web App on Default Port 8000:
+# (Accessible at http://127.0.0.1:8000)
+.\venv\Scripts\python.exe app.py
+
+# Launch Web App on a Custom Port (e.g., 8080):
+# PowerShell:
+$env:PORT="8080"; .\venv\Scripts\python.exe app.py
+
+# Windows CMD:
+set PORT=8080 && .\venv\Scripts\python.exe app.py
+
+# Linux / macOS / Bash:
+PORT=8080 ./venv/Scripts/python.exe app.py
+
+
+
+# ==============================================================================
+# 3. REAL-TIME STORAGE DRIFT OPERATIONS (OPTIONAL / ADVANCED)
+# ==============================================================================
+
+# Setup Drift Notification Queues (AWS SQS + GCP Pub/Sub):
+.\venv\Scripts\python.exe scripts/ops/drift/setup_aws_drift_queue.py
+.\venv\Scripts\python.exe scripts/ops/drift/setup_gcp_drift_queue.py
+
+# Start Real-Time Multi-Cloud Drift Listener Daemon:
+# (Listens for file moves/renames in S3/GCS and auto-updates SQLite metadata.db in <5ms without re-indexing)
+.\venv\Scripts\python.exe scripts/ops/drift/gcp_aws_drift_listener.py
+
+# Teardown Drift Queues when finished:
+.\venv\Scripts\python.exe scripts/ops/drift/deprovision_aws_drift_queue.py
+.\venv\Scripts\python.exe scripts/ops/drift/deprovision_gcp_drift_queue.py
+
+
+
+# ==============================================================================
+# 4. AUDIT & TEARDOWN WORKFLOWS
+# ==============================================================================
+
+# Real-Time Multi-Cloud Resource Audit (Inspects AWS S3/IAM, GCP GCS/IAM, and Auth0 users):
+.\venv\Scripts\python.exe scripts/ops/utils/audit_cloud_resources.py
+
+# Inspect Teardown Sequence Steps without executing:
+.\venv\Scripts\python.exe scripts/ops/utils/run_teardown_sequence.py --list
+
+# Execute Complete Automated Teardown & Reset:
+# (Destroys cloud buckets, IAM policies, Auth0 users, and purges local indices)
+.\venv\Scripts\python.exe scripts/ops/utils/run_teardown_sequence.py
+
+# Clean Local Generated Artifacts Only (Preserves keys & raw datasets):
+.\venv\Scripts\python.exe scripts/ops/utils/clean_generated_data.py

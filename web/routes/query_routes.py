@@ -45,8 +45,13 @@ def run_query():
     # 2. Authorization & IAM Inspection
     t1 = time.time()
     ac_manager = service.user_manager.get_ac_manager(user_name)
-    filtered, decisions, _, _ = service.permission_retriever.filter_docs(retrieved, ac_manager)
+    filtered, decisions, per_uuid_dur, _ = service.permission_retriever.filter_docs(retrieved, ac_manager)
     t_auth_ms = round((time.time() - t1) * 1000, 2)
+
+    cache_enabled = bool(getattr(service.permission_retriever.config, "use_cache", False)) if service.permission_retriever else False
+    hits_in_query = sum(1 for d in per_uuid_dur.values() if d < 0.001) if cache_enabled else 0
+    misses_in_query = len(per_uuid_dur) - hits_in_query if cache_enabled else len(per_uuid_dur)
+    is_cache_hit = (hits_in_query > 0 and misses_in_query == 0) if (cache_enabled and per_uuid_dur) else False
 
     # Build document attribution ledger
     doc_results = []
@@ -137,6 +142,13 @@ def run_query():
         "allowed_count": len(filtered),
         "total_retrieved": len(retrieved),
         "metrics": metrics,
+        "cache_verdict": {
+            "enabled": cache_enabled,
+            "hit": is_cache_hit,
+            "hits": hits_in_query,
+            "misses": misses_in_query,
+            "latency_ms": t_auth_ms
+        },
         "latencies": {
             "retrieval_ms": t_retrieval_ms,
             "authorization_ms": t_auth_ms,

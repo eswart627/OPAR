@@ -92,55 +92,66 @@ body {
   flex-direction: column;
 }
 
-/* Header & Navigation Bar */
+/* Header & Navigation Bar (Spacious, Crisp & Ergonomic) */
 .navbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 24px;
+  padding: 11px 28px;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
 }
 
 .nav-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  white-space: nowrap;
 }
 
 .brand-title {
-  font-weight: 700;
-  font-size: 15px;
+  font-weight: 750;
+  font-size: 16px;
   letter-spacing: -0.2px;
   color: var(--text-primary);
+  white-space: nowrap;
 }
 
 .nav-tabs {
   display: flex;
-  gap: 4px;
+  gap: 6px;
   background: var(--bg-elevated);
-  padding: 3px;
-  border-radius: var(--radius-sm);
+  padding: 4px;
+  border-radius: 8px;
   border: 1px solid var(--border-subtle);
+  margin-left: auto;
+  margin-right: 24px;
 }
 
 .nav-tab {
   background: transparent;
   color: var(--text-secondary);
   border: none;
-  padding: 6px 14px;
-  border-radius: var(--radius-sm);
-  font-size: 12px;
-  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 650;
   cursor: pointer;
   transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.nav-tab:hover:not(.active) {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.6);
 }
 
 .nav-tab.active {
   background: var(--bg-surface);
   color: var(--text-primary);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1);
 }
 
 /* Main Viewport Container: Full Width Edge-to-Edge with clean subtle padding */

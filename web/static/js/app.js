@@ -3,10 +3,14 @@
 
 import { ApiClient } from "./api_client.js";
 import { store } from "./state_store.js";
+import { ConfigController, renderQueryCacheIndicator } from "./components/config_controller.js";
+
+let configController = null;
 
 // DOM References
 const tabs = document.querySelectorAll(".nav-tab");
 const views = {
+  config: document.getElementById("view-config"),
   playground: document.getElementById("view-playground"),
   dataset: document.getElementById("view-dataset"),
   benchmark: document.getElementById("view-benchmark"),
@@ -57,10 +61,12 @@ tabs.forEach((tab) => {
     tab.classList.add("active");
 
     Object.keys(views).forEach((v) => {
-      views[v].style.display = v === target ? "block" : "none";
+      views[v].style.display = v === target ? (v === "playground" ? "flex" : "block") : "none";
     });
 
     if (target === "benchmark") loadBenchmarkMetrics();
+    if (target === "config" && configController) configController.refreshState();
+    if (target === "dataset") loadStorageSummary();
   });
 });
 
@@ -121,6 +127,11 @@ async function initializeApp() {
       renderQuestionChips(status.dataset.questions);
       document.getElementById("dataset-question-count").textContent = status.dataset.question_count;
       document.getElementById("dataset-filename").textContent = status.dataset.file_name;
+    }
+
+    if (!configController) {
+      configController = new ConfigController();
+      configController.startPolling(2000);
     }
   } catch (err) {
     backendStatusBadge.textContent = "Offline";
@@ -219,6 +230,10 @@ btnRunQuery.addEventListener("click", async () => {
 
     if (result.metrics) {
       metricsPill.textContent = `EM: ${result.metrics.exact_match.toFixed(2)} | F1: ${result.metrics.f1.toFixed(2)}`;
+    }
+
+    if (result.cache_verdict) {
+      renderQueryCacheIndicator(result.cache_verdict);
     }
 
     // Render Document Ledger
@@ -341,19 +356,139 @@ datasetFileInput.addEventListener("change", async (e) => {
   }
 });
 
-btnReingest.addEventListener("click", async () => {
-  btnReingest.disabled = true;
-  btnReingest.textContent = "Rebuilding Vector Databases...";
+async function loadStorageSummary() {
+  const awsList = document.getElementById("dataset-aws-buckets-list");
+  const gcpList = document.getElementById("dataset-gcp-buckets-list");
+  const docBadge = document.getElementById("storage-summary-doc-count");
+  const awsRegionBadge = document.getElementById("aws-storage-region-badge");
+  const gcpRegionBadge = document.getElementById("gcp-storage-region-badge");
+
   try {
-    const res = await ApiClient.triggerIngest();
-    alert(res.message);
+    const summary = await ApiClient.getStorageSummary();
+    if (!summary) return;
+
+    if (docBadge) {
+      docBadge.textContent = `${summary.total_documents} Total Documents`;
+      docBadge.className = summary.total_documents > 0 ? "badge badge-allowed" : "badge badge-neutral";
+    }
+
+    if (awsRegionBadge && summary.aws && summary.aws.region) {
+      awsRegionBadge.textContent = summary.aws.region;
+    }
+    if (gcpRegionBadge && summary.gcp && summary.gcp.region) {
+      gcpRegionBadge.textContent = summary.gcp.region;
+    }
+
+    // Render AWS Buckets
+    if (awsList && summary.aws && summary.aws.buckets) {
+      if (summary.aws.buckets.length === 0) {
+        awsList.innerHTML = `<div style="color: var(--text-muted); font-size: 11px;">No AWS buckets found in access model.</div>`;
+      } else {
+        awsList.innerHTML = summary.aws.buckets.map(b => `
+          <div style="background: #ffffff; border: 1px solid #e2e8f0; padding: 7px 10px; border-radius: 5px; display: flex; align-items: center; justify-content: space-between; gap: 6px;">
+            <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              <strong style="color: #0f172a; font-size: 11px;">${b.name}</strong>
+              <div style="color: #64748b; font-size: 10px;">${b.policy}</div>
+            </div>
+            <span class="badge badge-allowed" style="font-weight: 700; font-size: 10.5px; flex-shrink: 0; box-shadow: 0 0 6px rgba(34, 197, 94, 0.4);">
+              ${b.file_count} files
+            </span>
+          </div>
+        `).join("");
+      }
+    }
+
+    // Render GCP Buckets
+    if (gcpList && summary.gcp && summary.gcp.buckets) {
+      if (summary.gcp.buckets.length === 0) {
+        gcpList.innerHTML = `<div style="color: var(--text-muted); font-size: 11px;">No GCP buckets found in access model.</div>`;
+      } else {
+        gcpList.innerHTML = summary.gcp.buckets.map(b => `
+          <div style="background: #ffffff; border: 1px solid #e2e8f0; padding: 7px 10px; border-radius: 5px; display: flex; align-items: center; justify-content: space-between; gap: 6px;">
+            <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              <strong style="color: #0f172a; font-size: 11px;">${b.name}</strong>
+              <div style="color: #64748b; font-size: 10px;">${b.policy}</div>
+            </div>
+            <span class="badge badge-allowed" style="font-weight: 700; font-size: 10.5px; flex-shrink: 0; box-shadow: 0 0 6px rgba(34, 197, 94, 0.4);">
+              ${b.file_count} files
+            </span>
+          </div>
+        `).join("");
+      }
+    }
   } catch (err) {
-    alert("Ingestion error: " + err.message);
-  } finally {
-    btnReingest.disabled = false;
-    btnReingest.textContent = "Rebuild FAISS & BM25 Vector Databases";
+    console.warn("Storage summary load error:", err.message);
   }
-});
+}
+
+const ingestFeedback = document.getElementById("ingest-feedback");
+
+if (btnReingest) {
+  btnReingest.addEventListener("click", async () => {
+    btnReingest.disabled = true;
+    btnReingest.textContent = "Executing Multi-Cloud Pipeline (01–07)...";
+    if (ingestFeedback) {
+      ingestFeedback.style.display = "block";
+      ingestFeedback.style.background = "#f1f5f9";
+      ingestFeedback.style.color = "#334155";
+      ingestFeedback.textContent = "⏳ Running Stages 01–07: generating access model, provisioning cloud resources, partitioning documents, and building dual indices...";
+    }
+    try {
+      const res = await ApiClient.triggerIngest();
+      if (ingestFeedback) {
+        ingestFeedback.style.background = "#f0fdf4";
+        ingestFeedback.style.color = "#15803d";
+        ingestFeedback.textContent = `✔ ${res.message || "Pipeline completed successfully."}`;
+      }
+      await loadStorageSummary();
+      await initializeApp();
+    } catch (err) {
+      if (ingestFeedback) {
+        ingestFeedback.style.background = "#fef2f2";
+        ingestFeedback.style.color = "#b91c1c";
+        ingestFeedback.textContent = `✖ Ingestion error: ${err.message}`;
+      }
+    } finally {
+      btnReingest.disabled = false;
+      btnReingest.textContent = "Execute Multi-Cloud Ingestion Pipeline";
+    }
+  });
+}
+
+const btnTeardownPipeline = document.getElementById("btn-teardown-pipeline");
+
+if (btnTeardownPipeline) {
+  btnTeardownPipeline.addEventListener("click", async () => {
+    btnTeardownPipeline.disabled = true;
+    btnTeardownPipeline.textContent = "Executing Teardown Sequence...";
+    if (ingestFeedback) {
+      ingestFeedback.style.display = "block";
+      ingestFeedback.style.background = "#fffbeb";
+      ingestFeedback.style.color = "#b45309";
+      ingestFeedback.textContent = "⏳ Executing complete teardown sequence (cloud deprovisioning, Auth0 user cleanup, and local data purge)...";
+    }
+    try {
+      const res = await ApiClient.teardownPipeline();
+      if (ingestFeedback) {
+        ingestFeedback.style.background = "#f0fdf4";
+        ingestFeedback.style.color = "#15803d";
+        ingestFeedback.textContent = `✔ ${res.message || "Teardown sequence complete."}`;
+      }
+      await loadStorageSummary();
+      await initializeApp();
+    } catch (err) {
+      if (ingestFeedback) {
+        ingestFeedback.style.background = "#fef2f2";
+        ingestFeedback.style.color = "#b91c1c";
+        ingestFeedback.textContent = `✖ Teardown error: ${err.message}`;
+      }
+    } finally {
+      btnTeardownPipeline.disabled = false;
+      btnTeardownPipeline.textContent = "Clear Pipeline (Execute Teardown Sequence)";
+    }
+  });
+}
 
 // Start
 initializeApp();
+loadStorageSummary();

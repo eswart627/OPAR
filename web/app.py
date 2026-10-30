@@ -7,6 +7,7 @@ from web.routes.status_routes import status_bp
 from web.routes.dataset_routes import dataset_bp
 from web.routes.query_routes import query_bp
 from web.routes.metrics_routes import metrics_bp
+from web.routes.config_routes import config_bp
 
 def create_app() -> Flask:
     static_folder = os.path.join(os.path.dirname(__file__), "static")
@@ -17,6 +18,7 @@ def create_app() -> Flask:
     app.register_blueprint(dataset_bp, url_prefix="/api")
     app.register_blueprint(query_bp, url_prefix="/api")
     app.register_blueprint(metrics_bp, url_prefix="/api")
+    app.register_blueprint(config_bp, url_prefix="/api/config")
 
     @app.route("/")
     def index():

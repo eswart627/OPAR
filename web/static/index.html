@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/css/stepper.css">
   <link rel="stylesheet" href="/css/audit_ledger.css">
   <link rel="stylesheet" href="/css/concepts.css">
+  <link rel="stylesheet" href="/css/config_operations.css">
 </head>
 <body>
 
@@ -18,45 +19,205 @@
       <span id="backend-status-badge" class="badge badge-neutral" style="margin-left: 6px;">Connecting...</span>
     </div>
     <div class="nav-tabs" role="tablist">
-      <button class="nav-tab active" data-tab="playground" id="tab-playground">Query & Audit</button>
-      <button class="nav-tab" data-tab="dataset" id="tab-dataset">Dataset & Ingestion</button>
+      <button class="nav-tab active" data-tab="dataset" id="tab-dataset">Dataset & Ingestion</button>
+      <button class="nav-tab" data-tab="config" id="tab-config">Pipeline Config & Operations</button>
+      <button class="nav-tab" data-tab="playground" id="tab-playground">Query & Audit</button>
       <button class="nav-tab" data-tab="benchmark" id="tab-benchmark">Evaluation Matrix</button>
       <button class="nav-tab" data-tab="concepts" id="tab-concepts">Concepts & Architecture</button>
     </div>
+    <div class="nav-right-placeholder"></div>
   </header>
 
   <main class="container">
 
-    <!-- Stepper (Visibility of System Status) -->
-    <div class="stepper-container" id="progressive-stepper">
-      <div class="step-item" id="step-1">
-        <div class="step-indicator">1</div>
-        <div class="step-content">
-          <div class="step-title">Multi-Hop Retrieval</div>
-          <div class="step-meta" id="step-1-meta">FAISS + BM25</div>
+    <!-- VIEW 0: Pipeline Operations & Config -->
+    <div id="view-config" class="view-panel" style="display: none;">
+      <div class="config-grid">
+
+        <!-- Left Column: Settings, Caching, IdP, and Drift Queues -->
+        <div class="config-left-col">
+
+          <!-- Card 1: In-Memory Decision Cache -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">1. In-Memory Permission Cache (Unix TTL)</h2>
+              <span id="cfg-cache-badge" class="badge badge-blocked">Disabled</span>
+            </div>
+            <div class="card-body" style="display: flex; flex-direction: column; gap: 10px; font-size: 12px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 12px;">
+                <div>
+                  <strong>Decision Caching (300s TTL)</strong>
+                  <div style="font-size: 11px; color: var(--text-muted);">Caches allow/deny verdicts in-memory for sub-millisecond queries</div>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="cfg-cache-toggle">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+
+              <!-- Telemetry Metrics Grid -->
+              <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; text-align: center;">
+                <div class="stat-chip">
+                  <div class="stat-chip-label">Hits</div>
+                  <div class="stat-chip-val" id="cfg-cache-hits">0</div>
+                </div>
+                <div class="stat-chip">
+                  <div class="stat-chip-label">Misses</div>
+                  <div class="stat-chip-val" id="cfg-cache-misses">0</div>
+                </div>
+                <div class="stat-chip">
+                  <div class="stat-chip-label">Hit Ratio</div>
+                  <div class="stat-chip-val" id="cfg-cache-ratio">0.0%</div>
+                </div>
+                <div class="stat-chip">
+                  <div class="stat-chip-label">Speed</div>
+                  <div class="stat-chip-val" id="cfg-cache-speed">0.05 ms</div>
+                </div>
+              </div>
+
+              <!-- Cache Actions -->
+              <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                <button id="btn-cache-flush" class="btn-secondary" style="padding: 6px 10px; font-size: 11px;">Flush All Cache</button>
+                <div style="display: flex; align-items: center; gap: 6px; margin-left: auto;">
+                  <select id="cfg-cache-user-select" style="font-size: 11px; padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 4px; background: white;">
+                    <option value="user-1">user-1 (Restricted)</option>
+                    <option value="user-3">user-3 (Departmental)</option>
+                    <option value="baseline-admin">baseline-admin (Admin)</option>
+                  </select>
+                  <button id="btn-cache-evict-user" class="btn-outline" style="padding: 6px 10px; font-size: 11px;">Evict User</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 2: Multi-Cloud Event Drift Notification Queues -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">2. Multi-Cloud Event Drift Queues</h2>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span id="cfg-queues-spinner" style="display: none; font-size: 11px; color: var(--text-muted);">⏳ Working...</span>
+                <span id="cfg-queues-master-badge" class="badge badge-blocked">Not Deployed</span>
+              </div>
+            </div>
+            <div class="card-body" style="display: flex; flex-direction: column; gap: 10px; font-size: 12px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+                <div style="font-size: 11.5px; color: var(--text-secondary);">
+                  Multi-cloud queue provisioning (10 S3 & GCS buckets bound):
+                </div>
+                <div style="display: flex; gap: 6px;">
+                  <button id="btn-queues-setup-all" class="btn-primary" style="padding: 6px 10px; font-size: 11px;">Deploy Queues</button>
+                  <button id="btn-queues-teardown-all" class="btn-outline" style="padding: 6px 10px; font-size: 11px; color: #dc2626; border-color: #fca5a5;">Destroy All</button>
+                </div>
+              </div>
+
+              <!-- Side-by-Side Cloud Cards -->
+              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+                <!-- AWS SQS -->
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 6px;">
+                  <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <strong style="font-size: 11.5px; color: #0f172a;">AWS S3 &rarr; SQS</strong>
+                    <span id="cfg-aws-queue-badge" class="badge badge-blocked" style="font-size: 10px;">Not Deployed</span>
+                  </div>
+                  <div style="font-size: 10.5px; color: #475569; word-break: break-all;">
+                    Queue: <code style="font-size: 10px;">drift-queue</code><br>
+                    Bound: 5 S3 Buckets
+                  </div>
+                  <div style="display: flex; gap: 4px; margin-top: 4px;">
+                    <button id="btn-setup-aws-queue" class="btn-secondary" style="padding: 4px 8px; font-size: 10.5px;">Deploy</button>
+                    <button id="btn-teardown-aws-queue" class="btn-outline" style="padding: 4px 8px; font-size: 10.5px;">Destroy</button>
+                  </div>
+                </div>
+
+                <!-- GCP Pub/Sub -->
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 6px;">
+                  <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <strong style="font-size: 11.5px; color: #0f172a;">GCP GCS &rarr; Pub/Sub</strong>
+                    <span id="cfg-gcp-queue-badge" class="badge badge-blocked" style="font-size: 10px;">Not Deployed</span>
+                  </div>
+                  <div style="font-size: 10.5px; color: #475569; word-break: break-all;">
+                    Sub: <code style="font-size: 10px;">drift-sub</code><br>
+                    Bound: 5 GCS Buckets
+                  </div>
+                  <div style="display: flex; gap: 4px; margin-top: 4px;">
+                    <button id="btn-setup-gcp-queue" class="btn-secondary" style="padding: 4px 8px; font-size: 10.5px;">Deploy</button>
+                    <button id="btn-teardown-gcp-queue" class="btn-outline" style="padding: 4px 8px; font-size: 10.5px;">Destroy</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
-      </div>
-      <div class="step-divider"></div>
-      <div class="step-item" id="step-2">
-        <div class="step-indicator">2</div>
-        <div class="step-content">
-          <div class="step-title">IAM Authorization</div>
-          <div class="step-meta" id="step-2-meta">AWS S3 & GCP IAM</div>
+
+        <!-- Right Column: Full-Height Live Listener Daemon & Streaming Console -->
+        <div class="config-right-col">
+          <div class="card" style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
+            <div class="card-header">
+              <h2 class="card-title">3. Real-Time Drift Listener Daemon & Streaming Console</h2>
+              <span id="cfg-listener-badge" class="badge badge-blocked">Stopped</span>
+            </div>
+            <div class="card-body" style="display: flex; flex-direction: column; gap: 10px; flex: 1; overflow: hidden; padding: 12px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <button id="btn-listener-start" class="btn-primary" style="padding: 7px 12px; font-size: 11.5px;">Start Listener Daemon</button>
+                  <button id="btn-listener-stop" class="btn-outline" style="padding: 7px 12px; font-size: 11.5px; color: #dc2626; border-color: #fca5a5;" disabled>Stop Listener</button>
+                  <select id="cfg-listener-provider-select" style="font-size: 11px; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 4px; background: white;">
+                    <option value="all">Unified Multi-Cloud (AWS + GCP)</option>
+                    <option value="aws">AWS S3 Only (SQS)</option>
+                    <option value="gcp">GCP GCS Only (Pub/Sub)</option>
+                  </select>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <label style="font-size: 11px; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                    <input type="checkbox" id="cfg-autoscroll-chk" checked> Auto-scroll
+                  </label>
+                  <button id="btn-clear-terminal" class="btn-outline" style="padding: 6px 10px; font-size: 11px;">Clear Terminal</button>
+                </div>
+              </div>
+
+              <!-- Terminal Console Box takes 100% of remaining vertical height in the right card! -->
+              <div id="cfg-terminal-console" class="terminal-console-box">
+                <span class="log-dim">[Ready] Click "Start Listener Daemon" to stream live drift events...</span>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
-      <div class="step-divider"></div>
-      <div class="step-item" id="step-3">
-        <div class="step-indicator">3</div>
-        <div class="step-content">
-          <div class="step-title">Grounded Synthesis</div>
-          <div class="step-meta" id="step-3-meta">Gemini Engine</div>
-        </div>
+
       </div>
     </div>
 
     <!-- VIEW 1: Query & Audit Studio -->
-    <div id="view-playground" class="view-panel">
-      <div class="workspace-grid">
+    <div id="view-playground" class="view-panel" style="display: none; flex-direction: column; gap: 8px;">
+
+      <!-- Stepper (Visibility of System Status - Strictly for Query & Audit) -->
+      <div class="stepper-container" id="progressive-stepper" style="margin-bottom: 2px; flex-shrink: 0;">
+        <div class="step-item" id="step-1">
+          <div class="step-indicator">1</div>
+          <div class="step-content">
+            <div class="step-title">Multi-Hop Retrieval</div>
+            <div class="step-meta" id="step-1-meta">FAISS + BM25</div>
+          </div>
+        </div>
+        <div class="step-divider"></div>
+        <div class="step-item" id="step-2">
+          <div class="step-indicator">2</div>
+          <div class="step-content">
+            <div class="step-title">IAM Authorization</div>
+            <div class="step-meta" id="step-2-meta">AWS S3 & GCP IAM</div>
+          </div>
+        </div>
+        <div class="step-divider"></div>
+        <div class="step-item" id="step-3">
+          <div class="step-indicator">3</div>
+          <div class="step-content">
+            <div class="step-title">Grounded Synthesis</div>
+            <div class="step-meta" id="step-3-meta">Gemini Engine</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="workspace-grid" style="flex: 1; height: auto;">
 
         <!-- Controls Column -->
         <section class="card" aria-label="Query Controls" style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
@@ -121,7 +282,10 @@
             <div class="answer-box">
               <div class="answer-header">
                 <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 700;">Grounded Output</span>
-                <div id="metrics-pill" style="font-size: 11px; font-family: var(--font-mono); color: var(--text-secondary);">EM: -- | F1: --</div>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <span id="query-cache-indicator" class="badge badge-neutral" style="font-size: 10px; display: none;">Cache: --</span>
+                  <div id="metrics-pill" style="font-size: 11px; font-family: var(--font-mono); color: var(--text-secondary);">EM: -- | F1: --</div>
+                </div>
               </div>
               <div class="answer-text" id="answer-output">Select a question and click "Run Query" to evaluate.</div>
               <div class="gold-answer-box" id="gold-answer-box" style="display: none;">
@@ -157,7 +321,7 @@
     </div>
 
     <!-- VIEW 2: Dataset & Ingestion Center (Balanced 2-Column Multi-Cloud Layout) -->
-    <div id="view-dataset" class="view-panel" style="display: none;">
+    <div id="view-dataset" class="view-panel">
       <div style="display: grid; grid-template-columns: 460px 1fr; gap: 16px; width: 100%; height: 100%; overflow: hidden;">
         
         <!-- Left Column: Ingestion Controls & Benchmark Status -->
@@ -185,16 +349,63 @@
                 <div style="font-size: 11.5px; color: var(--text-muted);">Required keys: _id, question, answer, context, supporting_facts</div>
               </div>
               <div id="upload-feedback" style="margin-top: 10px; font-size: 12px; display: none;"></div>
-              <button id="btn-reingest" class="btn-secondary" style="margin-top: 12px; width: 100%; padding: 10px; font-size: 12.5px;">Rebuild FAISS & BM25 Indices</button>
             </div>
           </div>
+
+          <!-- Identity & Access Provider (IdP) Mode Selection -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">Identity & Access Provider (IdP) Mode</h2>
+              <span id="cfg-auth-mode-badge" class="badge badge-allowed">Auth0 Enterprise</span>
+            </div>
+            <div class="card-body" style="display: flex; flex-direction: column; gap: 10px; font-size: 12px;">
+              <div style="font-size: 11.5px; color: var(--text-secondary);">
+                Active identity bridge configured for AWS & GCP permission provisioning and evaluation:
+              </div>
+              <div class="mode-toggle" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px;">
+                <button class="mode-pill selected" id="cfg-idp-auth0" data-idp="auth0">Auth0 Enterprise (OIDC + STS)</button>
+                <button class="mode-pill" id="cfg-idp-static" data-idp="static">Static IAM (Permanent Keys)</button>
+              </div>
+
+              <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 10px; font-size: 11px; display: flex; flex-direction: column; gap: 4px; color: #475569;">
+                <div><strong>Auth0 Tenant:</strong> <span id="cfg-auth0-domain" style="font-family: var(--font-mono); color: #0f172a;">dev-26pdgc8nkquxcu0n.us.auth0.com</span></div>
+                <div><strong>AWS STS Role:</strong> <span style="font-family: var(--font-mono); color: #0f172a; word-break: break-all;">arn:aws:iam::804431972673:role/Corporate-RAG-Auth0-Role</span></div>
+                <div><strong>GCP WIF Pool:</strong> <span style="font-family: var(--font-mono); color: #0f172a;">auth0-pool (projects/283433618318)</span></div>
+              </div>
+
+              <div id="cfg-idp-feedback" style="font-size: 11px; color: var(--text-muted); min-height: 14px;"></div>
+            </div>
+          </div>
+
+          <!-- Execution Action Card -->
+          <div class="card">
+            <div class="card-body" style="display: flex; flex-direction: column; gap: 8px;">
+              <button id="btn-reingest" class="btn-primary" style="width: 100%; padding: 12px; font-size: 13px; font-weight: 600;">Execute Multi-Cloud Ingestion Pipeline</button>
+              <div style="font-size: 11px; color: var(--text-muted); text-align: center;">
+                Orchestrates pipeline stages 01 through 07: Access Model, Cloud Provisioning, and Dual-Index Build.
+              </div>
+
+              <!-- Clear & Teardown Action Button -->
+              <button id="btn-teardown-pipeline" class="btn-outline" style="width: 100%; padding: 10px; font-size: 12px; font-weight: 600; color: #dc2626; border-color: #fca5a5; margin-top: 4px;">
+                Clear Pipeline (Execute Teardown Sequence)
+              </button>
+              <div style="font-size: 10.5px; color: #64748b; text-align: center;">
+                Tears down cloud buckets, IAM policies, Auth0 users, and wipes local indices for a clean mode switch.
+              </div>
+
+              <div id="ingest-feedback" style="font-size: 11.5px; margin-top: 6px; display: none; padding: 8px 10px; border-radius: 4px;"></div>
+            </div>
+          </div>
+
         </div>
 
         <!-- Right Column: Cloud Storage & IAM Access Topology Inspector -->
         <div class="card" style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
           <div class="card-header">
             <h2 class="card-title">Multi-Cloud Storage & IAM Access Topology</h2>
-            <span class="badge badge-neutral">10 Enterprise Buckets</span>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span id="storage-summary-doc-count" class="badge badge-neutral" style="font-weight: 600;">Loading...</span>
+            </div>
           </div>
           <div class="card-body" style="overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 14px;">
             <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 4px;">
@@ -206,24 +417,10 @@
               <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
                 <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">
                   <strong style="font-size: 12px; color: #0f172a;">Amazon Web Services (S3)</strong>
-                  <span class="badge badge-neutral" style="font-size: 9px;">ap-south-1</span>
+                  <span id="aws-storage-region-badge" class="badge badge-neutral" style="font-size: 9px;">ap-south-1</span>
                 </div>
-                <div style="font-size: 11px; color: #475569; display: flex; flex-direction: column; gap: 6px;">
-                  <div style="background: #ffffff; border: 1px solid #e2e8f0; padding: 6px 8px; border-radius: 4px;">
-                    <strong>aogpoyks-aws-bucket-1</strong> <span style="color: #64748b;">(ABAC: attr_a=a1)</span>
-                  </div>
-                  <div style="background: #ffffff; border: 1px solid #e2e8f0; padding: 6px 8px; border-radius: 4px;">
-                    <strong>aogpoyks-aws-bucket-2</strong> <span style="color: #64748b;">(ABAC: attr_a=a1, b=b1)</span>
-                  </div>
-                  <div style="background: #ffffff; border: 1px solid #e2e8f0; padding: 6px 8px; border-radius: 4px;">
-                    <strong>aogpoyks-aws-bucket-3</strong> <span style="color: #64748b;">(ABAC: attr_c=c2)</span>
-                  </div>
-                  <div style="background: #ffffff; border: 1px solid #e2e8f0; padding: 6px 8px; border-radius: 4px;">
-                    <strong>aogpoyks-aws-bucket-4</strong> <span style="color: #64748b;">(ABAC: attr_b=b2, c=c1)</span>
-                  </div>
-                  <div style="background: #ffffff; border: 1px solid #e2e8f0; padding: 6px 8px; border-radius: 4px;">
-                    <strong>aogpoyks-aws-bucket-5</strong> <span style="color: #64748b;">(ABAC: attr_b=b2)</span>
-                  </div>
+                <div id="dataset-aws-buckets-list" style="font-size: 11px; color: #475569; display: flex; flex-direction: column; gap: 6px;">
+                  <div style="color: var(--text-muted); font-size: 11px;">Loading AWS buckets...</div>
                 </div>
               </div>
 
@@ -231,47 +428,33 @@
               <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
                 <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">
                   <strong style="font-size: 12px; color: #0f172a;">Google Cloud Platform (GCS)</strong>
-                  <span class="badge badge-neutral" style="font-size: 9px;">asia-south1</span>
+                  <span id="gcp-storage-region-badge" class="badge badge-neutral" style="font-size: 9px;">asia-south1</span>
                 </div>
-                <div style="font-size: 11px; color: #475569; display: flex; flex-direction: column; gap: 6px;">
-                  <div style="background: #ffffff; border: 1px solid #e2e8f0; padding: 6px 8px; border-radius: 4px;">
-                    <strong>aogpoyks-gcp-bucket-1</strong> <span style="color: #64748b;">(RBAC: role_read_bucket_1)</span>
-                  </div>
-                  <div style="background: #ffffff; border: 1px solid #e2e8f0; padding: 6px 8px; border-radius: 4px;">
-                    <strong>aogpoyks-gcp-bucket-2</strong> <span style="color: #64748b;">(RBAC: role_read_bucket_2)</span>
-                  </div>
-                  <div style="background: #ffffff; border: 1px solid #e2e8f0; padding: 6px 8px; border-radius: 4px;">
-                    <strong>aogpoyks-gcp-bucket-3</strong> <span style="color: #64748b;">(RBAC: role_read_bucket_3)</span>
-                  </div>
-                  <div style="background: #ffffff; border: 1px solid #e2e8f0; padding: 6px 8px; border-radius: 4px;">
-                    <strong>aogpoyks-gcp-bucket-4</strong> <span style="color: #64748b;">(RBAC: role_read_bucket_4)</span>
-                  </div>
-                  <div style="background: #ffffff; border: 1px solid #e2e8f0; padding: 6px 8px; border-radius: 4px;">
-                    <strong>aogpoyks-gcp-bucket-5</strong> <span style="color: #64748b;">(RBAC: role_read_bucket_5)</span>
-                  </div>
+                <div id="dataset-gcp-buckets-list" style="font-size: 11px; color: #475569; display: flex; flex-direction: column; gap: 6px;">
+                  <div style="color: var(--text-muted); font-size: 11px;">Loading GCP buckets...</div>
                 </div>
               </div>
             </div>
 
             <!-- Ingestion Pipeline Stage Indicator -->
             <div style="margin-top: 8px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px;">
-              <strong style="font-size: 12px; color: #0f172a; display: block; margin-bottom: 6px;">Dual-Index Ingestion Pipeline Architecture</strong>
+              <strong style="font-size: 12px; color: #0f172a; display: block; margin-bottom: 6px;">Dual-Index Ingestion Pipeline Architecture (Stages 01–07)</strong>
               <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; text-align: center; font-size: 10.5px;">
                 <div style="background: #f1f5f9; padding: 6px; border-radius: 4px; border: 1px solid #cbd5e1;">
-                  <strong>1. HotpotQA Parsing</strong>
-                  <div style="color: #64748b; font-size: 9.5px;">Entity & Context Extraction</div>
+                  <strong>1. Access Model & Cloud</strong>
+                  <div style="color: #64748b; font-size: 9.5px;">Scripts 01 & 02 (RBAC / ABAC)</div>
                 </div>
                 <div style="background: #f1f5f9; padding: 6px; border-radius: 4px; border: 1px solid #cbd5e1;">
-                  <strong>2. Chunking & Storage</strong>
-                  <div style="color: #64748b; font-size: 9.5px;">AWS/GCP Resource Map</div>
+                  <strong>2. Chunking & Upload</strong>
+                  <div style="color: #64748b; font-size: 9.5px;">Scripts 03 & 04 (Multi-Cloud)</div>
                 </div>
                 <div style="background: #f1f5f9; padding: 6px; border-radius: 4px; border: 1px solid #cbd5e1;">
-                  <strong>3. Dense Embedding</strong>
-                  <div style="color: #64748b; font-size: 9.5px;">all-MiniLM-L6-v2 (384D)</div>
+                  <strong>3. Visibility & Questions</strong>
+                  <div style="color: #64748b; font-size: 9.5px;">Scripts 05 & 06 (User Personas)</div>
                 </div>
                 <div style="background: #f1f5f9; padding: 6px; border-radius: 4px; border: 1px solid #cbd5e1;">
                   <strong>4. Dual Index Build</strong>
-                  <div style="color: #64748b; font-size: 9.5px;">FAISS FlatIP + BM25 Model</div>
+                  <div style="color: #64748b; font-size: 9.5px;">Script 07 (FAISS + BM25)</div>
                 </div>
               </div>
             </div>
